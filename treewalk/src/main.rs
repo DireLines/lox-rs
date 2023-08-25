@@ -63,7 +63,6 @@ impl<'a> Iterator for Scanner<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            println!("{self:?}");
             if self.source.len() == self.next_unparsed {
                 return None;
             }
@@ -147,34 +146,29 @@ impl<'a> Iterator for Scanner<'a> {
                     line: self.line,
                 });
             }
-            let t = match c {
-                '/' => {
-                    if after_c == '/' {
-                        //eat comment
-                        if let Some((comment, _rest)) = unparsed.split_once('\n') {
-                            self.next_unparsed += comment.len();
-                        } else {
-                            //end of file with no newline
-                            self.next_unparsed += unparsed.len();
-                        }
-                        continue;
+            // / or comment
+            if c == '/' {
+                if after_c == '/' {
+                    //eat comment
+                    if let Some((comment, _rest)) = unparsed.split_once('\n') {
+                        self.next_unparsed += comment.len();
                     } else {
-                        Some(TokenType::SLASH)
+                        //end of file with no newline
+                        self.next_unparsed += unparsed.len();
                     }
+                    continue;
+                } else {
+                    let l = c.len_utf8();
+                    self.next_unparsed += l;
+                    return Some(Token {
+                        token: TokenType::SLASH,
+                        lexeme: &unparsed[..l],
+                        line: self.line,
+                    });
                 }
-                _ => None,
-            };
-            if let Some(token) = t {
-                let l = c.len_utf8();
-                self.next_unparsed += l;
-                return Some(Token {
-                    token,
-                    lexeme: &unparsed[..l],
-                    line: self.line,
-                });
             }
+            //string literal
             if c == '"' {
-                //string literal
                 if let Some((literal, _rest)) = unparsed[1..].split_once('"') {
                     self.line += literal.chars().filter(|c| *c == '\n').count();
                     self.next_unparsed += literal.len() + 2;
