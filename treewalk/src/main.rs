@@ -41,6 +41,7 @@ fn runPrompt() -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 struct Scanner<'a> {
     source: &'a str,
     next_unparsed: usize,
@@ -61,86 +62,146 @@ impl<'a> Iterator for Scanner<'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let unparsed = &self.source[self.next_unparsed..];
-        let c: char = unparsed.chars().next()?;
-        //one character tokens
-        let t = match c {
-            '(' => Some(TokenType::LEFT_PAREN),
-            ')' => Some(TokenType::RIGHT_PAREN),
-            '{' => Some(TokenType::LEFT_BRACE),
-            '}' => Some(TokenType::RIGHT_BRACE),
-            ',' => Some(TokenType::COMMA),
-            '.' => Some(TokenType::DOT),
-            '-' => Some(TokenType::MINUS),
-            '+' => Some(TokenType::PLUS),
-            ';' => Some(TokenType::SEMICOLON),
-            '*' => Some(TokenType::STAR),
-            _ => None,
-        };
-        if let Some(token) = t {
-            let l = c.len_utf8();
-            self.next_unparsed += l;
-            return Some(Token {
-                token,
-                lexeme: &unparsed[..l],
-                line: self.line,
-            });
+        loop {
+            println!("{self:?}");
+            if self.source.len() == self.next_unparsed {
+                return None;
+            }
+            let unparsed = &self.source[self.next_unparsed..];
+            let c: char = unparsed.chars().next()?;
+            //skip whitespace
+            match c {
+                '\n' => {
+                    self.line += 1;
+                    self.next_unparsed += 1;
+                    continue;
+                }
+                ' ' | '\r' | '\t' => {
+                    self.next_unparsed += 1;
+                    continue;
+                }
+                _ => {}
+            };
+            //one character tokens
+            let t = match c {
+                '(' => Some(TokenType::LEFT_PAREN),
+                ')' => Some(TokenType::RIGHT_PAREN),
+                '{' => Some(TokenType::LEFT_BRACE),
+                '}' => Some(TokenType::RIGHT_BRACE),
+                ',' => Some(TokenType::COMMA),
+                '.' => Some(TokenType::DOT),
+                '-' => Some(TokenType::MINUS),
+                '+' => Some(TokenType::PLUS),
+                ';' => Some(TokenType::SEMICOLON),
+                '*' => Some(TokenType::STAR),
+                _ => None,
+            };
+            if let Some(token) = t {
+                let l = c.len_utf8();
+                self.next_unparsed += l;
+                return Some(Token {
+                    token,
+                    lexeme: &unparsed[..l],
+                    line: self.line,
+                });
+            }
+            //two-character tokens
+            let after_c = unparsed.chars().nth(1)?;
+            let equals_next = after_c == '=';
+            let token_advance = match c {
+                '!' => {
+                    if equals_next {
+                        Some((TokenType::BANG_EQUAL, 2))
+                    } else {
+                        Some((TokenType::BANG, 1))
+                    }
+                }
+                '=' => {
+                    if equals_next {
+                        Some((TokenType::EQUAL_EQUAL, 2))
+                    } else {
+                        Some((TokenType::EQUAL, 1))
+                    }
+                }
+                '<' => {
+                    if equals_next {
+                        Some((TokenType::LESS_EQUAL, 2))
+                    } else {
+                        Some((TokenType::LESS, 1))
+                    }
+                }
+                '>' => {
+                    if equals_next {
+                        Some((TokenType::GREATER_EQUAL, 2))
+                    } else {
+                        Some((TokenType::GREATER, 1))
+                    }
+                }
+                _ => None,
+            };
+            if let Some((token, token_length)) = token_advance {
+                self.next_unparsed += token_length;
+                return Some(Token {
+                    token,
+                    lexeme: &unparsed[..token_length],
+                    line: self.line,
+                });
+            }
+            let t = match c {
+                '/' => {
+                    if after_c == '/' {
+                        //eat comment
+                        if let Some((comment, _rest)) = unparsed.split_once('\n') {
+                            self.next_unparsed += comment.len();
+                        } else {
+                            //end of file with no newline
+                            self.next_unparsed += unparsed.len();
+                        }
+                        continue;
+                    } else {
+                        Some(TokenType::SLASH)
+                    }
+                }
+                _ => None,
+            };
+            if let Some(token) = t {
+                let l = c.len_utf8();
+                self.next_unparsed += l;
+                return Some(Token {
+                    token,
+                    lexeme: &unparsed[..l],
+                    line: self.line,
+                });
+            }
+            if c == '"' {
+                //string literal
+                if let Some((literal, _rest)) = unparsed[1..].split_once('"') {
+                    self.line += literal.chars().filter(|c| *c == '\n').count();
+                    self.next_unparsed += literal.len() + 2;
+                    return Some(Token {
+                        token: TokenType::STRING(literal),
+                        lexeme: literal,
+                        line: self.line,
+                    });
+                } else {
+                    //unterminated string
+                    panic!("Unterminated string at line {}", self.line);
+                }
+            }
+
+            panic!("Unexpected input: {:?}!", c);
         }
-        //two-character tokens
-        let after_c = unparsed.chars().nth(1)?;
-        let equals_next = after_c == '=';
-        let t = match c {
-            '!' => {
-                if equals_next {
-                    Some(TokenType::BANG_EQUAL)
-                } else {
-                    Some(TokenType::BANG)
-                }
-            }
-            '=' => {
-                if equals_next {
-                    Some(TokenType::EQUAL_EQUAL)
-                } else {
-                    Some(TokenType::EQUAL)
-                }
-            }
-            '<' => {
-                if equals_next {
-                    Some(TokenType::LESS_EQUAL)
-                } else {
-                    Some(TokenType::LESS)
-                }
-            }
-            '>' => {
-                if equals_next {
-                    Some(TokenType::GREATER_EQUAL)
-                } else {
-                    Some(TokenType::GREATER)
-                }
-            }
-            _ => None,
-        };
-        if let Some(token) = t {
-            let l = 2;
-            self.next_unparsed += l;
-            return Some(Token {
-                token,
-                lexeme: &unparsed[..l],
-                line: self.line,
-            });
-        }
-        None
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Token<'a> {
     token: TokenType<'a>,
     lexeme: &'a str,
     line: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[rustfmt::skip]
 enum TokenType<'a> {
     // Single-character tokens.
@@ -169,7 +230,85 @@ fn run(source: &str) {
     //make a Scanner
     let mut scanner = Scanner::new(source);
     //get tokens from scanner
-    for token in scanner {}
+    for token in scanner {
+        println!("{token:#?}");
+    }
     //print tokens
     println!("running on {source}");
+}
+
+#[test]
+fn test_simple_lexer() {
+    let sample = "> << / //  this is a comment\n> / +";
+    let mut scanner = Scanner::new(sample);
+    let x = scanner.collect::<Vec<_>>();
+    use TokenType::*;
+    assert_eq!(
+        x,
+        vec![
+            Token {
+                token: GREATER,
+                lexeme: ">",
+                line: 0
+            },
+            Token {
+                token: LESS,
+                lexeme: "<",
+                line: 0
+            },
+            Token {
+                token: LESS,
+                lexeme: "<",
+                line: 0
+            },
+            Token {
+                token: SLASH,
+                lexeme: "/",
+                line: 0
+            },
+            Token {
+                token: GREATER,
+                lexeme: ">",
+                line: 1
+            },
+            Token {
+                token: SLASH,
+                lexeme: "/",
+                line: 1
+            },
+            Token {
+                token: PLUS,
+                lexeme: "+",
+                line: 1
+            }
+        ]
+    );
+}
+
+#[test]
+fn test_string_literal() {
+    let sample = " > \"multiline\nstring\nliteral\" > ";
+    let mut scanner = Scanner::new(sample);
+    let x = scanner.collect::<Vec<_>>();
+    use TokenType::*;
+    assert_eq!(
+        x,
+        vec![
+            Token {
+                token: GREATER,
+                lexeme: ">",
+                line: 0
+            },
+            Token {
+                token: STRING("multiline\nstring\nliteral"),
+                lexeme: "multiline\nstring\nliteral",
+                line: 2
+            },
+            Token {
+                token: GREATER,
+                lexeme: ">",
+                line: 2
+            }
+        ]
+    );
 }
