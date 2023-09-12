@@ -96,11 +96,11 @@ impl<'a> Iterator for Scanner<'a> {
                 _ => None,
             };
             if let Some(token) = t {
-                let l = c.len_utf8();
-                self.next_unparsed += l;
+                let token_length = c.len_utf8();
+                self.next_unparsed += token_length;
                 return Some(Token {
                     token,
-                    lexeme: &unparsed[..l],
+                    lexeme: &unparsed[..token_length],
                     line: self.line,
                 });
             }
@@ -158,11 +158,11 @@ impl<'a> Iterator for Scanner<'a> {
                     }
                     continue;
                 } else {
-                    let l = c.len_utf8();
-                    self.next_unparsed += l;
+                    let token_length = c.len_utf8();
+                    self.next_unparsed += token_length;
                     return Some(Token {
                         token: TokenType::SLASH,
-                        lexeme: &unparsed[..l],
+                        lexeme: &unparsed[..token_length],
                         line: self.line,
                     });
                 }
@@ -182,7 +182,34 @@ impl<'a> Iterator for Scanner<'a> {
                     panic!("Unterminated string at line {}", self.line);
                 }
             }
-
+            if c.is_ascii_digit() {
+                //number literal
+                let mut num_chars = 0;
+                let unparsed_chars = &mut unparsed.chars();
+                let mut found_dot = false;
+                //integer part
+                loop {
+                    match unparsed_chars.next() {
+                        Some(c) => {
+                            if c.is_ascii_digit() {
+                                num_chars += 1;
+                            } else if c == '.' && !found_dot {
+                                num_chars += 1;
+                                found_dot = true;
+                            } else {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                self.next_unparsed += num_chars;
+                return Some(Token {
+                    token: TokenType::NUMBER((&unparsed[0..num_chars]).parse().unwrap()),
+                    lexeme: &unparsed[0..num_chars],
+                    line: self.line,
+                });
+            }
             panic!("Unexpected input: {:?}!", c);
         }
     }
@@ -302,6 +329,64 @@ fn test_string_literal() {
                 token: GREATER,
                 lexeme: ">",
                 line: 2
+            }
+        ]
+    );
+}
+
+#[test]
+fn test_number_literal() {
+    let sample = " = 5 35.3 0.32.33 -4 = ";
+    let mut scanner = Scanner::new(sample);
+    let x = scanner.collect::<Vec<_>>();
+    use TokenType::*;
+    assert_eq!(
+        x,
+        vec![
+            Token {
+                token: EQUAL,
+                lexeme: "=",
+                line: 0
+            },
+            Token {
+                token: NUMBER(5.0),
+                lexeme: "5",
+                line: 0
+            },
+            Token {
+                token: NUMBER(35.3),
+                lexeme: "35.3",
+                line: 0
+            },
+            Token {
+                token: NUMBER(0.32),
+                lexeme: "0.32",
+                line: 0
+            },
+            Token {
+                token: DOT,
+                lexeme: ".",
+                line: 0
+            },
+            Token {
+                token: NUMBER(33.0),
+                lexeme: "33",
+                line: 0
+            },
+            Token {
+                token: MINUS,
+                lexeme: "-",
+                line: 0
+            },
+            Token {
+                token: NUMBER(4.0),
+                lexeme: "4",
+                line: 0
+            },
+            Token {
+                token: EQUAL,
+                lexeme: "=",
+                line: 0
             }
         ]
     );
