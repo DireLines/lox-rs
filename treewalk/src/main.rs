@@ -1,6 +1,26 @@
+use phf::phf_map;
 use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
+
+const KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
+    "and" =>    TokenType::AND,
+    "class" =>  TokenType::CLASS,
+    "else" =>   TokenType::ELSE,
+    "false" =>  TokenType::FALSE,
+    "for" =>    TokenType::FOR,
+    "fun" =>    TokenType::FUN,
+    "if" =>     TokenType::IF,
+    "nil" =>    TokenType::NIL,
+    "or" =>     TokenType::OR,
+    "print" =>  TokenType::PRINT,
+    "return" => TokenType::RETURN,
+    "super" =>  TokenType::SUPER,
+    "this" =>   TokenType::THIS,
+    "true" =>   TokenType::TRUE,
+    "var" =>    TokenType::VAR,
+    "while" =>  TokenType::WHILE,
+};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 fn main() -> Result<()> {
@@ -210,6 +230,40 @@ impl<'a> Iterator for Scanner<'a> {
                     line: self.line,
                 });
             }
+            let is_alpha = |c: char| c.is_ascii_alphabetic() || c == '_';
+            let is_alphanumeric = |c: char| c.is_ascii_alphanumeric() || c == '_';
+            if is_alpha(c) {
+                //ident or keyword
+                let mut num_chars = 0;
+                let unparsed_chars = &mut unparsed.chars();
+                loop {
+                    match unparsed_chars.next() {
+                        Some(c) => {
+                            if is_alphanumeric(c) {
+                                num_chars += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                self.next_unparsed += num_chars;
+                let lexeme = &unparsed[0..num_chars];
+                if let Some(&token_type) = KEYWORDS.get(lexeme) {
+                    return Some(Token {
+                        token: token_type,
+                        lexeme,
+                        line: self.line,
+                    });
+                } else {
+                    return Some(Token {
+                        token: TokenType::IDENTIFIER(lexeme),
+                        lexeme,
+                        line: self.line,
+                    });
+                }
+            }
             panic!("Unexpected input: {:?}!", c);
         }
     }
@@ -222,7 +276,7 @@ struct Token<'a> {
     line: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[rustfmt::skip]
 enum TokenType<'a> {
     // Single-character tokens.
@@ -247,6 +301,7 @@ enum TokenType<'a> {
 
     EOF
 }
+
 fn run(source: &str) {
     //make a Scanner
     let mut scanner = Scanner::new(source);
@@ -387,6 +442,74 @@ fn test_number_literal() {
                 token: EQUAL,
                 lexeme: "=",
                 line: 0
+            }
+        ]
+    );
+}
+
+#[test]
+fn test_keyword_ident() {
+    let sample = "var x = 5;\n var y = -x;";
+    let mut scanner = Scanner::new(sample);
+    let x = scanner.collect::<Vec<_>>();
+    use TokenType::*;
+    assert_eq!(
+        x,
+        vec![
+            Token {
+                token: VAR,
+                lexeme: "var",
+                line: 0
+            },
+            Token {
+                token: IDENTIFIER("x"),
+                lexeme: "x",
+                line: 0
+            },
+            Token {
+                token: EQUAL,
+                lexeme: "=",
+                line: 0
+            },
+            Token {
+                token: NUMBER(5.0),
+                lexeme: "5",
+                line: 0
+            },
+            Token {
+                token: SEMICOLON,
+                lexeme: ";",
+                line: 0
+            },
+            Token {
+                token: VAR,
+                lexeme: "var",
+                line: 1
+            },
+            Token {
+                token: IDENTIFIER("y"),
+                lexeme: "y",
+                line: 1
+            },
+            Token {
+                token: EQUAL,
+                lexeme: "=",
+                line: 1
+            },
+            Token {
+                token: MINUS,
+                lexeme: "-",
+                line: 1
+            },
+            Token {
+                token: IDENTIFIER("x"),
+                lexeme: "x",
+                line: 1
+            },
+            Token {
+                token: SEMICOLON,
+                lexeme: ";",
+                line: 1
             }
         ]
     );
