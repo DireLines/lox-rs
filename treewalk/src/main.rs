@@ -3,6 +3,48 @@ use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
 
+enum Expression {
+    LITERAL {
+        value: Literal,
+    },
+    GROUPING {
+        expression: Box<Expression>,
+    },
+    BINARY {
+        left: Box<Expression>,
+        operator: BinaryOperator,
+        right: Box<Expression>,
+    },
+    UNARY {
+        operator: UnaryOperator,
+        right: Box<Expression>,
+    },
+}
+
+enum Literal {
+    NUMBER(f64),
+    STRING(String),
+    TRUE,
+    FALSE,
+    NIL,
+}
+enum UnaryOperator {
+    MINUS,
+    BANG,
+}
+
+enum BinaryOperator {
+    MINUS,
+    PLUS,
+    EQUAL,
+    EQUAL_EQUAL,
+    BANG_EQUAL,
+    GREATER,
+    GREATER_EQUAL,
+    LESS,
+    LESS_EQUAL,
+}
+
 const KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "and" =>    TokenType::AND,
     "class" =>  TokenType::CLASS,
