@@ -16,5 +16,8 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
     - 2023-08-24 [video](https://www.youtube.com/watch?v=rjfGDjLN4sU&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ)
 5. [Representing Code](https://craftinginterpreters.com/representing-code.html)
     - 2023-09-21 [video](https://www.youtube.com/watch?v=hczALGjceAk&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=5)
+6. [Parsing Expressions](https://craftinginterpreters.com/parsing-expressions.html)
+    - 2023-10-05 [video](https://www.youtube.com/watch?v=zmgJvjUYzok&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=6)
+    - 2023-10-19 [video](https://www.youtube.com/watch?v=xQ08gdP7TCM)
     
     
