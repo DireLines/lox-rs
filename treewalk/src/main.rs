@@ -3,10 +3,12 @@ use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
 
+#[derive(Debug, PartialEq, Clone)]
 enum Expression {
-    LITERAL {
-        value: Literal,
-    },
+    NUMBER(f64),
+    STRING(String),
+    BOOL(bool),
+    NIL,
     GROUPING {
         expression: Box<Expression>,
     },
@@ -21,18 +23,86 @@ enum Expression {
     },
 }
 
-enum Literal {
-    NUMBER(f64),
-    STRING(String),
-    TRUE,
-    FALSE,
-    NIL,
+impl Expression {
+    fn parse<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        let t = tokens.get(0)?;
+        use crate::TokenType::*;
+        match t.token {
+            LEFT_PAREN => {
+                let (expr, tokens) = Self::parse(&tokens[1..])?;
+                let token_after = tokens.get(0)?;
+                if token_after.token != RIGHT_PAREN {
+                    panic!("missing right paren");
+                }
+                return Some((expr, &tokens[1..]));
+            }
+            RIGHT_PAREN => {
+                panic!("right paren with no left paren");
+            }
+            MINUS => {}
+            BANG => {}
+            EOF => {}
+            _ => return None,
+        }
+        None
+    }
+    fn parse_equality<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        unimplemented!()
+        // != ==
+    }
+    fn parse_comparison<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        unimplemented!()
+        //> >= < <=
+    }
+    fn parse_term<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        unimplemented!()
+        //MINUS
+        //PLUS
+    }
+    fn parse_factor<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        unimplemented!()
+        //SLASH
+        //STAR
+    }
+    fn parse_unary<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        let t = tokens.get(0)?;
+        use crate::TokenType::*;
+        match t.token {
+            MINUS => {
+                let rest = &tokens[1..];
+                let (expr, tokens) = Self::parse_unary(rest)?;
+                return Some((
+                    Expression::UNARY {
+                        operator: UnaryOperator::MINUS,
+                        right: Box::new(expr),
+                    },
+                    tokens,
+                ));
+            }
+            BANG => {}
+            _ => return Self::parse_primary(tokens),
+        }
+        None
+    }
+    fn parse_primary<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        unimplemented!()
+        //NUMBER
+        //STRING
+        //TRUE
+        //FALSE
+        //NIL
+        //LEFT_PAREN
+        //RIGHT_PAREN
+        //EOF
+    }
 }
+
+#[derive(Debug, PartialEq, Clone)]
 enum UnaryOperator {
     MINUS,
     BANG,
 }
-
+#[derive(Debug, PartialEq, Clone)]
 enum BinaryOperator {
     MINUS,
     PLUS,
@@ -555,4 +625,14 @@ fn test_keyword_ident() {
             }
         ]
     );
+}
+
+#[test]
+fn test_parse_expr() {
+    let sample = "(3)";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::parse(&tokens);
+    use Expression::*;
+    assert_eq!(x.unwrap().0, Expression::NUMBER(3.0));
 }
