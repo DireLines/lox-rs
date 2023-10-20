@@ -25,28 +25,10 @@ enum Expression {
 
 impl Expression {
     fn parse<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        let t = tokens.get(0)?;
-        use crate::TokenType::*;
-        match t.token {
-            LEFT_PAREN => {
-                let (expr, tokens) = Self::parse(&tokens[1..])?;
-                let token_after = tokens.get(0)?;
-                if token_after.token != RIGHT_PAREN {
-                    panic!("missing right paren");
-                }
-                return Some((expr, &tokens[1..]));
-            }
-            RIGHT_PAREN => {
-                panic!("right paren with no left paren");
-            }
-            MINUS => {}
-            BANG => {}
-            EOF => {}
-            _ => return None,
-        }
-        None
+        Self::parse_equality(tokens)
     }
     fn parse_equality<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+        let (l, tokens) = Self::parse_comparison(tokens)?;
         unimplemented!()
         // != ==
     }
@@ -103,7 +85,12 @@ impl Expression {
                 if token_after.token != RIGHT_PAREN {
                     panic!("missing right paren");
                 }
-                return Some((expr, &tokens[1..]));
+                return Some((
+                    Self::GROUPING {
+                        expression: Box::new(expr),
+                    },
+                    &tokens[1..],
+                ));
             }
             RIGHT_PAREN => {
                 panic!("right paren with no left paren");
@@ -654,6 +641,5 @@ fn test_parse_expr() {
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::parse(&tokens);
-    use Expression::*;
     assert_eq!(x.unwrap().0, Expression::NUMBER(3.0));
 }
