@@ -72,28 +72,49 @@ impl Expression {
                 let rest = &tokens[1..];
                 let (expr, tokens) = Self::parse_unary(rest)?;
                 return Some((
-                    Expression::UNARY {
+                    Self::UNARY {
                         operator: UnaryOperator::MINUS,
                         right: Box::new(expr),
                     },
                     tokens,
                 ));
             }
-            BANG => {}
+            BANG => {
+                let rest = &tokens[1..];
+                let (expr, tokens) = Self::parse_unary(rest)?;
+                return Some((
+                    Self::UNARY {
+                        operator: UnaryOperator::BANG,
+                        right: Box::new(expr),
+                    },
+                    tokens,
+                ));
+            }
             _ => return Self::parse_primary(tokens),
         }
-        None
     }
     fn parse_primary<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        unimplemented!()
-        //NUMBER
-        //STRING
-        //TRUE
-        //FALSE
-        //NIL
-        //LEFT_PAREN
-        //RIGHT_PAREN
-        //EOF
+        let t = tokens.get(0)?;
+        use crate::TokenType::*;
+        match t.token {
+            LEFT_PAREN => {
+                let (expr, tokens) = Self::parse(&tokens[1..])?;
+                let token_after = tokens.get(0)?;
+                if token_after.token != RIGHT_PAREN {
+                    panic!("missing right paren");
+                }
+                return Some((expr, &tokens[1..]));
+            }
+            RIGHT_PAREN => {
+                panic!("right paren with no left paren");
+            }
+            NUMBER(n) => return Some((Self::NUMBER(n), &tokens[1..])),
+            STRING(s) => return Some((Self::STRING(String::from(s)), &tokens[1..])),
+            TRUE => return Some((Self::BOOL(true), &tokens[1..])),
+            FALSE => return Some((Self::BOOL(false), &tokens[1..])),
+            NIL => return Some((Self::NIL, &tokens[1..])),
+            _ => return None,
+        }
     }
 }
 
