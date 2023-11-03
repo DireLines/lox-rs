@@ -11,13 +11,12 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
 3. [The Lox Language](https://craftinginterpreters.com/the-lox-language.html)
     - 2023-07-13
 4. [Scanning](https://craftinginterpreters.com/scanning.html)
-    - 2023-07-27 [video](https://www.youtube.com/watch?v=O32n1EPnmE4&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ)
-    - 2023-08-10 [video](https://www.youtube.com/watch?v=4Plq9rAF_Fk&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ)
-    - 2023-08-24 [video](https://www.youtube.com/watch?v=rjfGDjLN4sU&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ)
+    - 2023-07-27 [video](https://www.youtube.com/watch?v=O32n1EPnmE4&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=1)
+    - 2023-08-10 [video](https://www.youtube.com/watch?v=4Plq9rAF_Fk&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=2)
+    - 2023-08-24 [video](https://www.youtube.com/watch?v=rjfGDjLN4sU&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=3)
 5. [Representing Code](https://craftinginterpreters.com/representing-code.html)
-    - 2023-09-21 [video](https://www.youtube.com/watch?v=hczALGjceAk&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=5)
+    - 2023-09-21 [video](https://www.youtube.com/watch?v=hczALGjceAk&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=4)
 6. [Parsing Expressions](https://craftinginterpreters.com/parsing-expressions.html)
-    - 2023-10-05 [video](https://www.youtube.com/watch?v=zmgJvjUYzok&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=6)
-    - 2023-10-19 [video](https://www.youtube.com/watch?v=xQ08gdP7TCM)
-    
-    
+    - 2023-10-05 [video](https://www.youtube.com/watch?v=zmgJvjUYzok&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=5)
+    - 2023-10-19 [video](https://www.youtube.com/watch?v=xQ08gdP7TCM&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=6)
+    - 2023-11-02 [video](https://www.youtube.com/watch?v=nMzMOvNKAw8&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=7)
