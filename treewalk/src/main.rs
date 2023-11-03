@@ -23,56 +23,112 @@ enum Expression {
     },
 }
 
+impl TryFrom<TokenType<'_>> for UnaryOperator {
+    type Error = ();
+    fn try_from(value: TokenType) -> std::result::Result<Self, Self::Error> {
+        use crate::TokenType::*;
+        match value {
+            MINUS => Ok(Self::MINUS),
+            BANG => Ok(Self::BANG),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Expression {
     fn parse<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
         Self::parse_equality(tokens)
     }
     fn parse_equality<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        let (l, tokens) = Self::parse_comparison(tokens)?;
-        unimplemented!()
-        // != ==
+        let (mut expr, mut tokens) = Self::parse_comparison(tokens)?;
+
+        while let Some(operator) = tokens
+            .get(0)
+            .and_then(|t| BinaryOperator::try_parse_equality(t.token))
+        {
+            let rest = &tokens[1..];
+            let (unary, tok) = Self::parse_comparison(rest)?;
+            tokens = tok;
+            expr = Self::BINARY {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(unary),
+            };
+        }
+
+        Some((expr, tokens))
     }
     fn parse_comparison<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        unimplemented!()
-        //> >= < <=
+        let (mut expr, mut tokens) = Self::parse_term(tokens)?;
+
+        while let Some(operator) = tokens
+            .get(0)
+            .and_then(|t| BinaryOperator::try_parse_comparison(t.token))
+        {
+            let rest = &tokens[1..];
+            let (unary, tok) = Self::parse_term(rest)?;
+            tokens = tok;
+            expr = Self::BINARY {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(unary),
+            };
+        }
+
+        Some((expr, tokens))
     }
     fn parse_term<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        unimplemented!()
-        //MINUS
-        //PLUS
+        let (mut expr, mut tokens) = Self::parse_factor(tokens)?;
+
+        while let Some(operator) = tokens
+            .get(0)
+            .and_then(|t| BinaryOperator::try_parse_plus_minus(t.token))
+        {
+            let rest = &tokens[1..];
+            let (unary, tok) = Self::parse_factor(rest)?;
+            tokens = tok;
+            expr = Self::BINARY {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(unary),
+            };
+        }
+
+        Some((expr, tokens))
     }
     fn parse_factor<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        unimplemented!()
-        //SLASH
-        //STAR
+        let (mut expr, mut tokens) = Self::parse_unary(tokens)?;
+
+        while let Some(operator) = tokens
+            .get(0)
+            .and_then(|t| BinaryOperator::try_parse_mul_div(t.token))
+        {
+            let rest = &tokens[1..];
+            let (unary, tok) = Self::parse_unary(rest)?;
+            tokens = tok;
+            expr = Self::BINARY {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(unary),
+            };
+        }
+
+        Some((expr, tokens))
     }
     fn parse_unary<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
         let t = tokens.get(0)?;
-        use crate::TokenType::*;
-        match t.token {
-            MINUS => {
-                let rest = &tokens[1..];
-                let (expr, tokens) = Self::parse_unary(rest)?;
-                return Some((
-                    Self::UNARY {
-                        operator: UnaryOperator::MINUS,
-                        right: Box::new(expr),
-                    },
-                    tokens,
-                ));
-            }
-            BANG => {
-                let rest = &tokens[1..];
-                let (expr, tokens) = Self::parse_unary(rest)?;
-                return Some((
-                    Self::UNARY {
-                        operator: UnaryOperator::BANG,
-                        right: Box::new(expr),
-                    },
-                    tokens,
-                ));
-            }
-            _ => return Self::parse_primary(tokens),
+        if let Ok(operator) = UnaryOperator::try_from(t.token) {
+            let rest = &tokens[1..];
+            let (expr, tokens) = Self::parse_unary(rest)?;
+            Some((
+                Self::UNARY {
+                    operator,
+                    right: Box::new(expr),
+                },
+                tokens,
+            ))
+        } else {
+            Self::parse_primary(tokens)
         }
     }
     fn parse_primary<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
@@ -114,6 +170,8 @@ enum UnaryOperator {
 enum BinaryOperator {
     MINUS,
     PLUS,
+    SLASH,
+    STAR,
     EQUAL,
     EQUAL_EQUAL,
     BANG_EQUAL,
@@ -121,6 +179,40 @@ enum BinaryOperator {
     GREATER_EQUAL,
     LESS,
     LESS_EQUAL,
+}
+
+use crate::TokenType as TT;
+impl BinaryOperator {
+    fn try_parse_comparison(value: TokenType) -> Option<Self> {
+        match value {
+            TT::GREATER => Some(Self::GREATER),
+            TT::GREATER_EQUAL => Some(Self::GREATER_EQUAL),
+            TT::LESS => Some(Self::LESS),
+            TT::LESS_EQUAL => Some(Self::LESS_EQUAL),
+            _ => None,
+        }
+    }
+    fn try_parse_equality(value: TokenType) -> Option<Self> {
+        match value {
+            TT::EQUAL_EQUAL => Some(Self::EQUAL_EQUAL),
+            TT::BANG_EQUAL => Some(Self::BANG_EQUAL),
+            _ => None,
+        }
+    }
+    fn try_parse_plus_minus(value: TokenType) -> Option<Self> {
+        match value {
+            TT::PLUS => Some(Self::PLUS),
+            TT::MINUS => Some(Self::MINUS),
+            _ => None,
+        }
+    }
+    fn try_parse_mul_div(value: TokenType) -> Option<Self> {
+        match value {
+            TT::SLASH => Some(Self::SLASH),
+            TT::STAR => Some(Self::STAR),
+            _ => None,
+        }
+    }
 }
 
 const KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
@@ -245,8 +337,8 @@ impl<'a> Iterator for Scanner<'a> {
                 });
             }
             //two-character tokens
-            let after_c = unparsed.chars().nth(1)?;
-            let equals_next = after_c == '=';
+            let after_c = unparsed.chars().nth(1);
+            let equals_next = after_c == Some('=');
             let token_advance = match c {
                 '!' => {
                     if equals_next {
@@ -288,7 +380,7 @@ impl<'a> Iterator for Scanner<'a> {
             }
             // / or comment
             if c == '/' {
-                if after_c == '/' {
+                if after_c == Some('/') {
                     //eat comment
                     if let Some((comment, _rest)) = unparsed.split_once('\n') {
                         self.next_unparsed += comment.len();
@@ -640,6 +732,27 @@ fn test_parse_expr() {
     let sample = "(3)";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
-    assert_eq!(x.unwrap().0, Expression::NUMBER(3.0));
+    let x = Expression::parse_unary(&tokens);
+    assert_eq!(
+        x.unwrap().0,
+        Expression::GROUPING {
+            expression: Box::new(Expression::NUMBER(3.0))
+        }
+    );
+}
+
+#[test]
+fn test_parse_binary() {
+    let sample = "3 * 4";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::parse_factor(&tokens);
+    assert_eq!(
+        x.unwrap().0,
+        Expression::BINARY {
+            left: Box::new(Expression::NUMBER(3.0)),
+            operator: BinaryOperator::STAR,
+            right: Box::new(Expression::NUMBER(4.0))
+        }
+    );
 }
