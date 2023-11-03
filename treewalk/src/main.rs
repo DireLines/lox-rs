@@ -40,18 +40,61 @@ impl Expression {
         Self::parse_equality(tokens)
     }
     fn parse_equality<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        let (l, tokens) = Self::parse_comparison(tokens)?;
-        unimplemented!()
-        // != ==
+        let (mut expr, mut tokens) = Self::parse_comparison(tokens)?;
+
+        while let Some(operator) = tokens
+            .get(0)
+            .and_then(|t| BinaryOperator::try_parse_equality(t.token))
+        {
+            let rest = &tokens[1..];
+            let (unary, tok) = Self::parse_comparison(rest)?;
+            tokens = tok;
+            expr = Self::BINARY {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(unary),
+            };
+        }
+
+        Some((expr, tokens))
     }
     fn parse_comparison<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        unimplemented!()
-        //> >= < <=
+        let (mut expr, mut tokens) = Self::parse_term(tokens)?;
+
+        while let Some(operator) = tokens
+            .get(0)
+            .and_then(|t| BinaryOperator::try_parse_comparison(t.token))
+        {
+            let rest = &tokens[1..];
+            let (unary, tok) = Self::parse_term(rest)?;
+            tokens = tok;
+            expr = Self::BINARY {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(unary),
+            };
+        }
+
+        Some((expr, tokens))
     }
     fn parse_term<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        unimplemented!()
-        //MINUS
-        //PLUS
+        let (mut expr, mut tokens) = Self::parse_factor(tokens)?;
+
+        while let Some(operator) = tokens
+            .get(0)
+            .and_then(|t| BinaryOperator::try_parse_plus_minus(t.token))
+        {
+            let rest = &tokens[1..];
+            let (unary, tok) = Self::parse_factor(rest)?;
+            tokens = tok;
+            expr = Self::BINARY {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(unary),
+            };
+        }
+
+        Some((expr, tokens))
     }
     fn parse_factor<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
         let (mut expr, mut tokens) = Self::parse_unary(tokens)?;
