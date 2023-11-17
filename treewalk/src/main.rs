@@ -4,6 +4,15 @@ use std::error::Error;
 use std::io::{BufRead, Write};
 
 #[derive(Debug, PartialEq, Clone)]
+enum LoxSyntaxError<'a> {
+    UnexpectedEof,
+    UnexpectedToken {
+        lexeme: &'a str,
+        line: usize,
+        message: &'static str,
+    },
+}
+#[derive(Debug, PartialEq, Clone)]
 enum Expression {
     NUMBER(f64),
     STRING(String),
@@ -36,10 +45,14 @@ impl TryFrom<TokenType<'_>> for UnaryOperator {
 }
 
 impl Expression {
-    fn parse<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+    fn parse<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         Self::parse_equality(tokens)
     }
-    fn parse_equality<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+    fn parse_equality<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         let (mut expr, mut tokens) = Self::parse_comparison(tokens)?;
 
         while let Some(operator) = tokens
@@ -56,9 +69,12 @@ impl Expression {
             };
         }
 
-        Some((expr, tokens))
+        Ok((expr, tokens))
     }
-    fn parse_comparison<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+
+    fn parse_comparison<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         let (mut expr, mut tokens) = Self::parse_term(tokens)?;
 
         while let Some(operator) = tokens
@@ -75,9 +91,12 @@ impl Expression {
             };
         }
 
-        Some((expr, tokens))
+        Ok((expr, tokens))
     }
-    fn parse_term<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+
+    fn parse_term<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         let (mut expr, mut tokens) = Self::parse_factor(tokens)?;
 
         while let Some(operator) = tokens
@@ -94,9 +113,12 @@ impl Expression {
             };
         }
 
-        Some((expr, tokens))
+        Ok((expr, tokens))
     }
-    fn parse_factor<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
+
+    fn parse_factor<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         let (mut expr, mut tokens) = Self::parse_unary(tokens)?;
 
         while let Some(operator) = tokens
@@ -113,14 +135,17 @@ impl Expression {
             };
         }
 
-        Some((expr, tokens))
+        Ok((expr, tokens))
     }
-    fn parse_unary<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        let t = tokens.get(0)?;
+
+    fn parse_unary<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+        let t = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
         if let Ok(operator) = UnaryOperator::try_from(t.token) {
             let rest = &tokens[1..];
             let (expr, tokens) = Self::parse_unary(rest)?;
-            Some((
+            Ok((
                 Self::UNARY {
                     operator,
                     right: Box::new(expr),
@@ -131,17 +156,24 @@ impl Expression {
             Self::parse_primary(tokens)
         }
     }
-    fn parse_primary<'a>(tokens: &'a [Token<'a>]) -> Option<(Self, &[Token<'a>])> {
-        let t = tokens.get(0)?;
+
+    fn parse_primary<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+        let t = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
         use crate::TokenType::*;
         match t.token {
             LEFT_PAREN => {
                 let (expr, tokens) = Self::parse(&tokens[1..])?;
-                let token_after = tokens.get(0)?;
+                let token_after = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
                 if token_after.token != RIGHT_PAREN {
-                    panic!("missing right paren");
+                    return Err(LoxSyntaxError::UnexpectedToken {
+                        lexeme: token_after.lexeme,
+                        line: token_after.line,
+                        message: "missing right paren",
+                    });
                 }
-                return Some((
+                return Ok((
                     Self::GROUPING {
                         expression: Box::new(expr),
                     },
@@ -149,14 +181,22 @@ impl Expression {
                 ));
             }
             RIGHT_PAREN => {
-                panic!("right paren with no left paren");
+                return Err(LoxSyntaxError::UnexpectedToken {
+                    lexeme: t.lexeme,
+                    line: t.line,
+                    message: "right paren with no left paren",
+                });
             }
-            NUMBER(n) => return Some((Self::NUMBER(n), &tokens[1..])),
-            STRING(s) => return Some((Self::STRING(String::from(s)), &tokens[1..])),
-            TRUE => return Some((Self::BOOL(true), &tokens[1..])),
-            FALSE => return Some((Self::BOOL(false), &tokens[1..])),
-            NIL => return Some((Self::NIL, &tokens[1..])),
-            _ => return None,
+            NUMBER(n) => Ok((Self::NUMBER(n), &tokens[1..])),
+            STRING(s) => Ok((Self::STRING(String::from(s)), &tokens[1..])),
+            TRUE => Ok((Self::BOOL(true), &tokens[1..])),
+            FALSE => Ok((Self::BOOL(false), &tokens[1..])),
+            NIL => Ok((Self::NIL, &tokens[1..])),
+            _ => Err(LoxSyntaxError::UnexpectedToken {
+                lexeme: t.lexeme,
+                line: t.line,
+                message: "Unexpected token",
+            }),
         }
     }
 }
@@ -166,6 +206,7 @@ enum UnaryOperator {
     MINUS,
     BANG,
 }
+
 #[derive(Debug, PartialEq, Clone)]
 enum BinaryOperator {
     MINUS,
@@ -192,6 +233,7 @@ impl BinaryOperator {
             _ => None,
         }
     }
+
     fn try_parse_equality(value: TokenType) -> Option<Self> {
         match value {
             TT::EQUAL_EQUAL => Some(Self::EQUAL_EQUAL),
@@ -199,6 +241,7 @@ impl BinaryOperator {
             _ => None,
         }
     }
+
     fn try_parse_plus_minus(value: TokenType) -> Option<Self> {
         match value {
             TT::PLUS => Some(Self::PLUS),
@@ -206,6 +249,7 @@ impl BinaryOperator {
             _ => None,
         }
     }
+
     fn try_parse_mul_div(value: TokenType) -> Option<Self> {
         match value {
             TT::SLASH => Some(Self::SLASH),
@@ -746,7 +790,7 @@ fn test_parse_binary() {
     let sample = "3 * 4";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse_factor(&tokens);
+    let x = Expression::parse(&tokens);
     assert_eq!(
         x.unwrap().0,
         Expression::BINARY {
@@ -755,4 +799,82 @@ fn test_parse_binary() {
             right: Box::new(Expression::NUMBER(4.0))
         }
     );
+}
+
+#[test]
+fn test_parse_binary_assoc() {
+    let sample = "3 * 4 * 5";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::parse(&tokens);
+    use crate::Expression::*;
+    assert_eq!(
+        x.unwrap().0,
+        BINARY {
+            left: Box::new(BINARY {
+                left: Box::new(NUMBER(3.0)),
+                operator: BinaryOperator::STAR,
+                right: Box::new(NUMBER(4.0))
+            }),
+            operator: BinaryOperator::STAR,
+            right: Box::new(NUMBER(5.0))
+        }
+    );
+}
+
+#[test]
+fn test_syntax_error_unexpected() {
+    let sample = "/";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::parse(&tokens);
+    assert_eq!(
+        x,
+        Err(LoxSyntaxError::UnexpectedToken {
+            lexeme: "/",
+            line: 0,
+            message: "Unexpected token"
+        })
+    );
+}
+
+#[test]
+fn test_syntax_error_unexpected_paren() {
+    let sample = ")";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::parse(&tokens);
+    assert_eq!(
+        x,
+        Err(LoxSyntaxError::UnexpectedToken {
+            lexeme: ")",
+            line: 0,
+            message: "right paren with no left paren"
+        })
+    );
+}
+
+#[test]
+fn test_syntax_error_missing_paren() {
+    let sample = "(1 2";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::parse(&tokens);
+    assert_eq!(
+        x,
+        Err(LoxSyntaxError::UnexpectedToken {
+            lexeme: "2",
+            line: 0,
+            message: "missing right paren"
+        })
+    );
+}
+
+#[test]
+fn test_syntax_error_incomplete_binary() {
+    let sample = "3 +";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::parse(&tokens);
+    assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
 }
