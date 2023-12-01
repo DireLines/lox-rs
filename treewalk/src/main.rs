@@ -3,6 +3,58 @@ use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
 
+macro_rules! grammar_rule {
+    /*
+        (@munch $expr:expr  ----  $($rest:tt)*) => {
+            let expr2 = {
+                $expr;
+                // asdfasdf
+            }
+            mixed_result!(@munch expr2 $($rest)*)
+
+        };
+    (trace $name:ident; $($tail:tt)*) => {
+        {
+            println!(concat!(stringify!($name), " = {:?}"), $name);
+            mixed_rules!($($tail)*);
+        }
+    };
+    (trace $name:ident = $init:expr; $($tail:tt)*) => {
+        {
+            let $name = $init;
+            println!(concat!(stringify!($name), " = {:?}"), $name);
+            mixed_rules!($($tail)*);
+        }
+    };
+    ($name:ident → $($items:tt)*) => {
+        fn $name () {}
+        mixed_rules!(@munch {} $($items)*);
+    }
+   *() }*/
+
+   ($functionname:ident -> $($tail:tt)*) => {
+    fn $function_name<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+        grammar_rule!(@munch tokens $($tail)*)
+    }
+   }
+
+   (@munch $tokens:ident $literal:lit $($tail:tt)*) => {
+    let first_token = tokens.get(0)?;
+    if first_token == TokenType::STRING($literal) {
+        let mut tokens = &tokens[1..];
+        grammar_rule!(@munch tokens, $($tail)*)
+    } else {
+        return Err();
+    }
+   }
+}
+
+grammar_rule!(classDecl -> "class");
+
+//mixed_rules!(classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}");
+
 macro_rules! make_parse_binary_group {
     ( $function_name:ident, $constituent_function_name:ident, $comparison_function:expr) => {
         fn $function_name<'a>(
