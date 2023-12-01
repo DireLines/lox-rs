@@ -3,6 +3,37 @@ use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
 
+macro_rules! make_parse_binary_group {
+    ( $function_name:ident, $constituent_function_name:ident, $comparison_function:expr) => {
+        fn $function_name<'a>(
+            tokens: &'a [Token<'a>],
+        ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+            let (mut expr, mut tokens) = Self::$constituent_function_name(tokens)?;
+
+            while let Some(operator) = tokens.get(0).and_then(|t| $comparison_function(t.token)) {
+                let rest = &tokens[1..];
+                let (unary, tok) = Self::$constituent_function_name(rest)?;
+                tokens = tok;
+                expr = Self::BINARY {
+                    left: Box::new(expr),
+                    operator,
+                    right: Box::new(unary),
+                };
+            }
+
+            Ok((expr, tokens))
+        }
+    };
+}
+
+macro_rules! try_match_patterns {($($tok:tt), *) => {
+    |value| match value {
+        $(TokenType::$tok => Some(BinaryOperator::$tok),)*
+        _ => None
+    }
+}
+}
+
 #[derive(Debug, PartialEq, Clone)]
 enum LoxSyntaxError<'a> {
     UnexpectedEof,
@@ -44,99 +75,33 @@ impl TryFrom<TokenType<'_>> for UnaryOperator {
     }
 }
 
+//trait Parse {
+//fn parse<'a>(tokens: &'a [Tokens<'a>]) ->
+// std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> ;
+//}
+
 impl Expression {
     fn parse<'a>(
         tokens: &'a [Token<'a>],
     ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         Self::parse_equality(tokens)
     }
-    fn parse_equality<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let (mut expr, mut tokens) = Self::parse_comparison(tokens)?;
 
-        while let Some(operator) = tokens
-            .get(0)
-            .and_then(|t| BinaryOperator::try_parse_equality(t.token))
-        {
-            let rest = &tokens[1..];
-            let (unary, tok) = Self::parse_comparison(rest)?;
-            tokens = tok;
-            expr = Self::BINARY {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(unary),
-            };
-        }
+    // pay no attention to the man behind the curtain!
+    //fn parse_many<'a>(tokens: &'a, item: xxx, sep: yyyy)
 
-        Ok((expr, tokens))
-    }
-
-    fn parse_comparison<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let (mut expr, mut tokens) = Self::parse_term(tokens)?;
-
-        while let Some(operator) = tokens
-            .get(0)
-            .and_then(|t| BinaryOperator::try_parse_comparison(t.token))
-        {
-            let rest = &tokens[1..];
-            let (unary, tok) = Self::parse_term(rest)?;
-            tokens = tok;
-            expr = Self::BINARY {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(unary),
-            };
-        }
-
-        Ok((expr, tokens))
-    }
-
-    fn parse_term<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let (mut expr, mut tokens) = Self::parse_factor(tokens)?;
-
-        while let Some(operator) = tokens
-            .get(0)
-            .and_then(|t| BinaryOperator::try_parse_plus_minus(t.token))
-        {
-            let rest = &tokens[1..];
-            let (unary, tok) = Self::parse_factor(rest)?;
-            tokens = tok;
-            expr = Self::BINARY {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(unary),
-            };
-        }
-
-        Ok((expr, tokens))
-    }
-
-    fn parse_factor<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let (mut expr, mut tokens) = Self::parse_unary(tokens)?;
-
-        while let Some(operator) = tokens
-            .get(0)
-            .and_then(|t| BinaryOperator::try_parse_mul_div(t.token))
-        {
-            let rest = &tokens[1..];
-            let (unary, tok) = Self::parse_unary(rest)?;
-            tokens = tok;
-            expr = Self::BINARY {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(unary),
-            };
-        }
-
-        Ok((expr, tokens))
-    }
+    make_parse_binary_group!(
+        parse_equality,
+        parse_comparison,
+        try_match_patterns!(EQUAL_EQUAL, BANG_EQUAL)
+    );
+    make_parse_binary_group!(
+        parse_comparison,
+        parse_term,
+        try_match_patterns!(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)
+    );
+    make_parse_binary_group!(parse_term, parse_factor, try_match_patterns!(PLUS, MINUS));
+    make_parse_binary_group!(parse_factor, parse_unary, try_match_patterns!(SLASH, STAR));
 
     fn parse_unary<'a>(
         tokens: &'a [Token<'a>],
@@ -220,43 +185,6 @@ enum BinaryOperator {
     GREATER_EQUAL,
     LESS,
     LESS_EQUAL,
-}
-
-use crate::TokenType as TT;
-impl BinaryOperator {
-    fn try_parse_comparison(value: TokenType) -> Option<Self> {
-        match value {
-            TT::GREATER => Some(Self::GREATER),
-            TT::GREATER_EQUAL => Some(Self::GREATER_EQUAL),
-            TT::LESS => Some(Self::LESS),
-            TT::LESS_EQUAL => Some(Self::LESS_EQUAL),
-            _ => None,
-        }
-    }
-
-    fn try_parse_equality(value: TokenType) -> Option<Self> {
-        match value {
-            TT::EQUAL_EQUAL => Some(Self::EQUAL_EQUAL),
-            TT::BANG_EQUAL => Some(Self::BANG_EQUAL),
-            _ => None,
-        }
-    }
-
-    fn try_parse_plus_minus(value: TokenType) -> Option<Self> {
-        match value {
-            TT::PLUS => Some(Self::PLUS),
-            TT::MINUS => Some(Self::MINUS),
-            _ => None,
-        }
-    }
-
-    fn try_parse_mul_div(value: TokenType) -> Option<Self> {
-        match value {
-            TT::SLASH => Some(Self::SLASH),
-            TT::STAR => Some(Self::STAR),
-            _ => None,
-        }
-    }
 }
 
 const KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
