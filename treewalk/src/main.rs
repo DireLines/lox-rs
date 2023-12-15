@@ -32,28 +32,63 @@ macro_rules! grammar_rule {
     }
    *() }*/
 
-   ($functionname:ident -> $($tail:tt)*) => {
-    fn $function_name<'a>(
+   ($make:path : $functionname:ident -> $($tail:tt)*) => {
+    fn $functionname<'a>(
         tokens: &'a [Token<'a>],
     ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+        let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
+        Ok(($make(body),tokens))
+    }
+   };
+
+   (@munch $tokens:ident IDENTIFIER $($tail:tt)*) => {{
+    let first_token = $tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
+    let mut tokens = &$tokens[1..];
+    match first_token.token {
+        TokenType::IDENTIFIER(ident) => {
+            let (rest,tokens) = grammar_rule!(@munch tokens $($tail)*)?;
+            Ok(((ident,rest),tokens)) //TODO combine ident/rest in ast
+        }
+        _ => return Err(LoxSyntaxError::UnexpectedToken{
+            lexeme: first_token.lexeme,
+            line: first_token.line,
+            message: "Unexpected token",
+    })
+    }
+   }};
+
+   (@munch $tokens:ident $literal:literal $($tail:tt)*) => {{
+    let first_token = $tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
+    if first_token.token == TokenType::STRING($literal) {
+        let mut tokens = &$tokens[1..];
         grammar_rule!(@munch tokens $($tail)*)
-    }
-   }
-
-   (@munch $tokens:ident $literal:lit $($tail:tt)*) => {
-    let first_token = tokens.get(0)?;
-    if first_token == TokenType::STRING($literal) {
-        let mut tokens = &tokens[1..];
-        grammar_rule!(@munch tokens, $($tail)*)
     } else {
-        return Err();
+        return Err(LoxSyntaxError::UnexpectedToken{
+                lexeme: first_token.lexeme,
+                line: first_token.line,
+                message: "Unexpected token",
+        })
     }
-   }
+   }};
+
+   (@munch $tokens:ident CLASS $($tail:tt)*) => {{
+    let first_token = $tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
+    if first_token.token == TokenType::CLASS {
+        let mut tokens = &$tokens[1..];
+        grammar_rule!(@munch tokens $($tail)*)
+    } else {
+        return Err(LoxSyntaxError::UnexpectedToken{
+                lexeme: first_token.lexeme,
+                line: first_token.line,
+                message: "Unexpected token",
+        })
+    }
+   }};
+
+   (@munch $tokens:ident) => {{
+    Ok(((),$tokens))
+   }}
 }
-
-grammar_rule!(classDecl -> "class");
-
-//mixed_rules!(classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}");
 
 macro_rules! make_parse_binary_group {
     ( $function_name:ident, $constituent_function_name:ident, $comparison_function:expr) => {
@@ -114,6 +149,20 @@ enum Expression {
         right: Box<Expression>,
     },
 }
+#[derive(Debug, PartialEq, Clone)]
+enum Declaration {
+    ClassDecl {
+        name: String,
+        parent_name: Option<String>,
+        body: Vec<()>,
+    },
+    FunDecl(()),
+    VarDecl {
+        name: String,
+        definition: Option<Expression>,
+    },
+    Statement,
+}
 
 impl TryFrom<TokenType<'_>> for UnaryOperator {
     type Error = ();
@@ -132,13 +181,26 @@ impl TryFrom<TokenType<'_>> for UnaryOperator {
 // std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> ;
 //}
 
+impl Declaration {
+    // grammar_rule!(classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
+    fn class_declaration(data: (&str, ())) -> Self {
+        let (ident, _) = data;
+        Self::ClassDecl {
+            name: ident.to_string(),
+            parent_name: None,
+            body: vec![],
+        }
+    }
+    grammar_rule!(Self::class_declaration : classDecl -> CLASS IDENTIFIER);
+    // IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
+}
+
 impl Expression {
     fn parse<'a>(
         tokens: &'a [Token<'a>],
     ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         Self::parse_equality(tokens)
     }
-
     // pay no attention to the man behind the curtain!
     //fn parse_many<'a>(tokens: &'a, item: xxx, sep: yyyy)
 
@@ -856,5 +918,14 @@ fn test_syntax_error_incomplete_binary() {
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::parse(&tokens);
+    assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
+}
+
+#[test]
+fn test_parse_class_decl() {
+    let sample = "class Foo";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Declaration::classDecl(&tokens);
     assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
 }
