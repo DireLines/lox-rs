@@ -932,5 +932,15 @@ fn test_parse_class_decl_inherit() {
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::classDecl(&tokens);
-    assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
+    assert_eq!(
+        x,
+        Ok((
+            Declaration::ClassDecl {
+                name: String::from("Foo"),
+                parent_name: Some(String::from("Bar")),
+                body: vec![]
+            },
+            &[][..]
+        ))
+    );
 }
