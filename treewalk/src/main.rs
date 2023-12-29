@@ -4,34 +4,6 @@ use std::error::Error;
 use std::io::{BufRead, Write};
 
 macro_rules! grammar_rule {
-    /*
-        (@munch $expr:expr  ----  $($rest:tt)*) => {
-            let expr2 = {
-                $expr;
-                // asdfasdf
-            }
-            mixed_result!(@munch expr2 $($rest)*)
-
-        };
-    (trace $name:ident; $($tail:tt)*) => {
-        {
-            println!(concat!(stringify!($name), " = {:?}"), $name);
-            mixed_rules!($($tail)*);
-        }
-    };
-    (trace $name:ident = $init:expr; $($tail:tt)*) => {
-        {
-            let $name = $init;
-            println!(concat!(stringify!($name), " = {:?}"), $name);
-            mixed_rules!($($tail)*);
-        }
-    };
-    ($name:ident → $($items:tt)*) => {
-        fn $name () {}
-        mixed_rules!(@munch {} $($items)*);
-    }
-   *() }*/
-
    ($make:path : $functionname:ident -> $($tail:tt)*) => {
     fn $functionname<'a>(
         tokens: &'a [Token<'a>],
@@ -42,46 +14,60 @@ macro_rules! grammar_rule {
    };
 
    (@munch $tokens:ident IDENTIFIER $($tail:tt)*) => {{
-    let first_token = $tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-    let mut tokens = &$tokens[1..];
-    match first_token.token {
-        TokenType::IDENTIFIER(ident) => {
-            let (rest,tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-            Ok(((ident,rest),tokens)) //TODO combine ident/rest in ast
-        }
-        _ => return Err(LoxSyntaxError::UnexpectedToken{
-            lexeme: first_token.lexeme,
-            line: first_token.line,
-            message: "Unexpected token",
-    })
+    match $tokens.get(0){
+        Some(first_token) =>{
+            let tokens = &$tokens[1..];
+            match first_token.token {
+                TokenType::IDENTIFIER(ident) => {
+                    match grammar_rule!(@munch tokens $($tail)*) {
+                        Ok((parsed_tail_ast,tokens)) => {
+                            Ok::<_, LoxSyntaxError>(((ident,parsed_tail_ast),tokens))
+                        },
+                        Err(e) =>Err(e)
+                    }
+                }
+                _ =>  Err(LoxSyntaxError::UnexpectedToken{
+                    lexeme: first_token.lexeme,
+                    line: first_token.line,
+                    message: "Unexpected token",
+            })
+            }
+        },
+        None => Err(LoxSyntaxError::UnexpectedEof)
     }
    }};
 
-   (@munch $tokens:ident $literal:literal $($tail:tt)*) => {{
-    let first_token = $tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-    if first_token.token == TokenType::STRING($literal) {
-        let mut tokens = &$tokens[1..];
-        grammar_rule!(@munch tokens $($tail)*)
-    } else {
-        return Err(LoxSyntaxError::UnexpectedToken{
-                lexeme: first_token.lexeme,
-                line: first_token.line,
-                message: "Unexpected token",
-        })
+   (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
+    let tokens = $tokens;
+    match grammar_rule!(@munch tokens $($subtree)+){
+    Ok((parsed_subtree_ast,leftover_tokens))=>{
+        //consume tokens for subtree
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail:tt)*)?;
+        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+    },
+    Err(_)=>{
+        //parse without consuming tokens for subtree
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail:tt)*)?;
+        Ok(((None,parsed_tail_ast),tokens))
     }
+   }
    }};
 
-   (@munch $tokens:ident CLASS $($tail:tt)*) => {{
-    let first_token = $tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-    if first_token.token == TokenType::CLASS {
-        let mut tokens = &$tokens[1..];
-        grammar_rule!(@munch tokens $($tail)*)
-    } else {
-        return Err(LoxSyntaxError::UnexpectedToken{
-                lexeme: first_token.lexeme,
-                line: first_token.line,
-                message: "Unexpected token",
-        })
+   (@munch $tokens:ident $tt:ident $($tail:tt)*) => {{
+    match $tokens.get(0) {
+        Some(first_token)=>{
+            if first_token.token == TokenType::$tt {
+                let tokens = &$tokens[1..];
+                grammar_rule!(@munch tokens $($tail)*)
+            } else {
+                Err(LoxSyntaxError::UnexpectedToken{
+                        lexeme: first_token.lexeme,
+                        line: first_token.line,
+                        message: "Unexpected token",
+                })
+            }
+        },
+        None => Err(LoxSyntaxError::UnexpectedEof)
     }
    }};
 
@@ -183,15 +169,15 @@ impl TryFrom<TokenType<'_>> for UnaryOperator {
 
 impl Declaration {
     // grammar_rule!(classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
-    fn class_declaration(data: (&str, ())) -> Self {
-        let (ident, _) = data;
+    fn class_declaration(data: (&str, (Option<(&str, ())>, ()))) -> Self {
+        let (ident, (parent_name, _)) = data;
         Self::ClassDecl {
             name: ident.to_string(),
-            parent_name: None,
+            parent_name: parent_name.map(|s| s.0.to_string()),
             body: vec![],
         }
     }
-    grammar_rule!(Self::class_declaration : classDecl -> CLASS IDENTIFIER);
+    grammar_rule!(Self::class_declaration : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )?);
     // IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
 }
 
@@ -922,8 +908,27 @@ fn test_syntax_error_incomplete_binary() {
 }
 
 #[test]
-fn test_parse_class_decl() {
+fn test_parse_class_decl_no_inherit() {
     let sample = "class Foo";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Declaration::classDecl(&tokens);
+    assert_eq!(
+        x,
+        Ok((
+            Declaration::ClassDecl {
+                name: String::from("Foo"),
+                parent_name: None,
+                body: vec![]
+            },
+            &[][..]
+        ))
+    );
+}
+
+#[test]
+fn test_parse_class_decl_inherit() {
+    let sample = "class Foo < Bar";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::classDecl(&tokens);
