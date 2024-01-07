@@ -4,15 +4,24 @@ use std::error::Error;
 use std::io::{BufRead, Write};
 
 macro_rules! grammar_rule {
-   ($make:path : $functionname:ident -> $($tail:tt)*) => {
+    ($functionname:ident -> $($tail:tt)*) => {
+        fn $functionname<'a>(
+            tokens: &'a [Token<'a>],
+        ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+            let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
+            Ok((body,tokens))
+        }
+       };
+   ($ast_build_fn:path : $functionname:ident -> $($tail:tt)*) => {
     fn $functionname<'a>(
         tokens: &'a [Token<'a>],
     ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-        Ok(($make(body),tokens))
+        Ok(($ast_build_fn(body),tokens))
     }
    };
 
+   //IDENTIFIER
    (@munch $tokens:ident IDENTIFIER $($tail:tt)*) => {{
     match $tokens.get(0){
         Some(first_token) =>{
@@ -37,26 +46,66 @@ macro_rules! grammar_rule {
     }
    }};
 
-   (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
+    //OPTIONAL GROUP ( a b )?
+    (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
     let tokens = $tokens;
     match grammar_rule!(@munch tokens $($subtree)+){
     Ok((parsed_subtree_ast,leftover_tokens))=>{
         //consume tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail:tt)*)?;
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
         Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
     },
     Err(_)=>{
         //parse without consuming tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail:tt)*)?;
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
         Ok(((None,parsed_tail_ast),tokens))
     }
    }
    }};
 
-   (@munch $tokens:ident $tt:ident $($tail:tt)*) => {{
+    //REPEATED GROUP ( a b )*
+    (@munch $tokens:ident ($($subtree:tt)+)* $($tail:tt)*) => {{
+    let mut tokens = $tokens;
+    let mut results = vec![];
+    loop {
+        match grammar_rule!(@munch tokens $($subtree)+){
+            Ok((parsed_subtree_ast,leftover_tokens))=>{
+                //consume tokens for subtree
+                results.push(parsed_subtree_ast);
+                tokens = leftover_tokens;
+            },
+            Err(_)=>{
+              break;
+            }
+        }
+    }
+    let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
+    Ok(((results,parsed_tail_ast),tokens))
+   }};
+
+
+    //OR GROUP ( a | b | c )
+    (@munch $tokens:ident ($($subtree:tt)|+) $($tail:tt)*) => {{
+    let tokens = $tokens;
+    match grammar_rule!(@munch tokens $($subtree)+){
+    Ok((parsed_subtree_ast,leftover_tokens))=>{
+        //consume tokens for subtree
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
+        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+    },
+    Err(_)=>{
+        //parse without consuming tokens for subtree
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
+        Ok(((None,parsed_tail_ast),tokens))
+    }
+   }
+   }};
+
+   //some token type not containing any data
+   (@munch $tokens:ident $token_type:ident $($tail:tt)*) => {{
     match $tokens.get(0) {
         Some(first_token)=>{
-            if first_token.token == TokenType::$tt {
+            if first_token.token == TokenType::$token_type {
                 let tokens = &$tokens[1..];
                 grammar_rule!(@munch tokens $($tail)*)
             } else {
@@ -71,6 +120,22 @@ macro_rules! grammar_rule {
     }
    }};
 
+   (@munch $tokens:ident ($parse_fn:path) $($tail:tt)*) => {{
+    //RECURSIVE PARSING FUNCTION CALL
+    let tokens = $tokens;
+    match $parse_fn(tokens) {
+    Ok((parsed_subtree_ast,leftover_tokens))=>{
+        //consume tokens for subtree
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
+        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+    },
+    Err(e)=>{
+        //pass along error from parsing subtree
+        Err(e)
+    }
+   }
+   }};
+
    (@munch $tokens:ident) => {{
     Ok(((),$tokens))
    }}
@@ -82,7 +147,6 @@ macro_rules! make_parse_binary_group {
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
             let (mut expr, mut tokens) = Self::$constituent_function_name(tokens)?;
-
             while let Some(operator) = tokens.get(0).and_then(|t| $comparison_function(t.token)) {
                 let rest = &tokens[1..];
                 let (unary, tok) = Self::$constituent_function_name(rest)?;
@@ -140,16 +204,31 @@ enum Declaration {
     ClassDecl {
         name: String,
         parent_name: Option<String>,
-        body: Vec<()>,
+        body: Vec<Function>,
     },
-    FunDecl(()),
+    FunDecl(Function),
     VarDecl {
         name: String,
         definition: Option<Expression>,
     },
     Statement,
 }
-
+#[derive(Debug, PartialEq, Clone)]
+struct Function {
+    name: String,
+    parameters: Option<Vec<String>>,
+    body: Box<Option<Statement>>,
+}
+#[derive(Debug, PartialEq, Clone)]
+enum Statement {
+    ExprStmt,
+    ForStmt,
+    IfStmt,
+    PrintStmt,
+    ReturnStmt,
+    WhileStmt,
+    Block,
+}
 impl TryFrom<TokenType<'_>> for UnaryOperator {
     type Error = ();
     fn try_from(value: TokenType) -> std::result::Result<Self, Self::Error> {
@@ -162,108 +241,85 @@ impl TryFrom<TokenType<'_>> for UnaryOperator {
     }
 }
 
+impl Function {
+    fn build_function(
+        data: (
+            &str,
+            (
+                Option<(&str, (Vec<(&str, ())>, ()))>,
+                (Option<Statement>, ()),
+            ),
+        ),
+    ) -> Self {
+        let (name, (params, (stmt, _))) = data;
+        Function {
+            name: name.to_string(),
+            parameters: params,
+            body: Box::new(stmt),
+        }
+    }
+    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN (Statement::block));
+}
+
+impl Statement {
+    grammar_rule!(statement -> ( (Self::exprStmt) | (Self::forStmt) | (Self::ifStmt) | (Self::printStmt) | (Self::returnStmt) | (Self::whileStmt) | (Self::block) ));
+    grammar_rule!(Self::build_expr_statement : exprStmt -> (Expression::expression) SEMICOLON );
+    grammar_rule!(Self::build_for_statement : forStmt -> FOR LEFT_PAREN ( (Declaration::varDecl) | (Self::exprStmt) | SEMICOLON )
+                               ((Expression::expression))? SEMICOLON
+                               ((Expression::expression))? RIGHT_PAREN (Self::statement) );
+    grammar_rule!(Self::build_if_statement : ifStmt -> IF LEFT_PAREN (Expression::expression) RIGHT_PAREN (Self::statement)
+                     ( ELSE (Self::statement) )? );
+    grammar_rule!(Self::build_print_statement : printStmt -> PRINT (Expression::expression) SEMICOLON );
+    grammar_rule!(Self::build_return_statement : returnStmt -> RETURN ((Expression::expression))? SEMICOLON );
+    grammar_rule!(Self::build_while_statement : whileStmt -> WHILE LEFT_PAREN (Expression::expression) RIGHT_PAREN (Self::statement) );
+    grammar_rule!(Self::build_block : block -> LEFT_BRACE ((Declaration::declaration))* RIGHT_BRACE );
+}
 //trait Parse {
 //fn parse<'a>(tokens: &'a [Tokens<'a>]) ->
 // std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> ;
 //}
-
 impl Declaration {
-    // grammar_rule!(classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
-    fn class_declaration(data: (&str, (Option<(&str, ())>, ()))) -> Self {
-        let (ident, (parent_name, _)) = data;
+    grammar_rule!(declaration -> ( (Self::classDecl) | (Self::funDecl) | (Self::varDecl) | (Statement::statement)));
+    fn build_class_decl(
+        data: (
+            &str,
+            (Option<(&str, ())>, (Vec<(Option<Function>, ())>, ())),
+        ),
+    ) -> Self {
+        let (ident, (parent_name, (body, _))) = data;
         Self::ClassDecl {
             name: ident.to_string(),
             parent_name: parent_name.map(|s| s.0.to_string()),
-            body: vec![],
+            body: body
+                .iter()
+                .map(|e| e.0.clone().unwrap())
+                .collect::<Vec<_>>(),
         }
     }
-    grammar_rule!(Self::class_declaration : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )?);
-    // IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
+    grammar_rule!(Self::build_class_decl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ((Function::function))* RIGHT_BRACE);
+    fn build_function_decl(data: (Option<Function>, ())) -> Self {
+        let (function, _) = data;
+        Self::FunDecl(function.unwrap())
+    }
+    grammar_rule!(Self::build_function_decl : funDecl -> FUN (Function::function));
+    grammar_rule!(Self::build_var_decl : varDecl -> VAR IDENTIFIER ( EQUAL (Expression::expression))? SEMICOLON);
 }
 
 impl Expression {
-    fn parse<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        Self::parse_equality(tokens)
-    }
-    // pay no attention to the man behind the curtain!
-    //fn parse_many<'a>(tokens: &'a, item: xxx, sep: yyyy)
+    grammar_rule!(expression -> (Self::assignment) );
+    grammar_rule!(Self::build_assignment : assignment -> ((( (Self::call) DOT )? IDENTIFIER EQUAL (Self::assignment)) | (Self::logic_or) ));
+    grammar_rule!(Self::build_logic_or : logic_or  -> (Self::logic_and) ( OR (Self::logic_and) )* );
+    grammar_rule!(Self::build_logic_and : logic_and -> (Self::equality) ( AND (Self::equality) )* );
+    grammar_rule!(Self::build_equality : equality  -> (Self::comparison) ( ( BANG_EQUAL | EQUAL_EQUAL ) (Self::comparison) )* );
+    grammar_rule!(Self::build_comparison : comparison-> (Self::term) ( ( GREATER | GREATER_EQUAL | LESS | LESS_EQUAL ) (Self::term) )* );
+    grammar_rule!(Self::build_term : term      -> (Self::factor) ( ( MINUS | PLUS ) (Self::factor) )* );
+    grammar_rule!(Self::build_factor : factor    -> (Self::unary) ( ( SLASH | STAR ) (Self::unary) )* );
 
-    make_parse_binary_group!(
-        parse_equality,
-        parse_comparison,
-        try_match_patterns!(EQUAL_EQUAL, BANG_EQUAL)
-    );
-    make_parse_binary_group!(
-        parse_comparison,
-        parse_term,
-        try_match_patterns!(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)
-    );
-    make_parse_binary_group!(parse_term, parse_factor, try_match_patterns!(PLUS, MINUS));
-    make_parse_binary_group!(parse_factor, parse_unary, try_match_patterns!(SLASH, STAR));
-
-    fn parse_unary<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let t = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-        if let Ok(operator) = UnaryOperator::try_from(t.token) {
-            let rest = &tokens[1..];
-            let (expr, tokens) = Self::parse_unary(rest)?;
-            Ok((
-                Self::UNARY {
-                    operator,
-                    right: Box::new(expr),
-                },
-                tokens,
-            ))
-        } else {
-            Self::parse_primary(tokens)
-        }
-    }
-
-    fn parse_primary<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let t = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-        use crate::TokenType::*;
-        match t.token {
-            LEFT_PAREN => {
-                let (expr, tokens) = Self::parse(&tokens[1..])?;
-                let token_after = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-                if token_after.token != RIGHT_PAREN {
-                    return Err(LoxSyntaxError::UnexpectedToken {
-                        lexeme: token_after.lexeme,
-                        line: token_after.line,
-                        message: "missing right paren",
-                    });
-                }
-                return Ok((
-                    Self::GROUPING {
-                        expression: Box::new(expr),
-                    },
-                    &tokens[1..],
-                ));
-            }
-            RIGHT_PAREN => {
-                return Err(LoxSyntaxError::UnexpectedToken {
-                    lexeme: t.lexeme,
-                    line: t.line,
-                    message: "right paren with no left paren",
-                });
-            }
-            NUMBER(n) => Ok((Self::NUMBER(n), &tokens[1..])),
-            STRING(s) => Ok((Self::STRING(String::from(s)), &tokens[1..])),
-            TRUE => Ok((Self::BOOL(true), &tokens[1..])),
-            FALSE => Ok((Self::BOOL(false), &tokens[1..])),
-            NIL => Ok((Self::NIL, &tokens[1..])),
-            _ => Err(LoxSyntaxError::UnexpectedToken {
-                lexeme: t.lexeme,
-                line: t.line,
-                message: "Unexpected token",
-            }),
-        }
-    }
+    grammar_rule!(Self::build_unary : unary     -> ((( BANG | MINUS ) (Self::unary)) | (Self::call) ));
+    grammar_rule!(Self::build_call : call      -> (Self::primary) ( (LEFT_PAREN ( (Self::expression) ( COMMA (Self::expression))* )? RIGHT_PAREN) | (DOT IDENTIFIER) )* );
+    grammar_rule!(Self::build_primary : primary   -> (TRUE | FALSE | NIL | THIS
+                   | NUMBER | STRING | IDENTIFIER | LEFT_PAREN expression RIGHT_PAREN
+                   | SUPER DOT IDENTIFIER ));
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -804,7 +860,7 @@ fn test_parse_expr() {
     let sample = "(3)";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse_unary(&tokens);
+    let x = Expression::unary(&tokens);
     assert_eq!(
         x.unwrap().0,
         Expression::GROUPING {
@@ -818,7 +874,7 @@ fn test_parse_binary() {
     let sample = "3 * 4";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x.unwrap().0,
         Expression::BINARY {
@@ -834,7 +890,7 @@ fn test_parse_binary_assoc() {
     let sample = "3 * 4 * 5";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     use crate::Expression::*;
     assert_eq!(
         x.unwrap().0,
@@ -855,7 +911,7 @@ fn test_syntax_error_unexpected() {
     let sample = "/";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -871,7 +927,7 @@ fn test_syntax_error_unexpected_paren() {
     let sample = ")";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -887,7 +943,7 @@ fn test_syntax_error_missing_paren() {
     let sample = "(1 2";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -903,13 +959,13 @@ fn test_syntax_error_incomplete_binary() {
     let sample = "3 +";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
 }
 
 #[test]
 fn test_parse_class_decl_no_inherit() {
-    let sample = "class Foo";
+    let sample = "class Foo {}";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::classDecl(&tokens);
@@ -928,7 +984,7 @@ fn test_parse_class_decl_no_inherit() {
 
 #[test]
 fn test_parse_class_decl_inherit() {
-    let sample = "class Foo < Bar";
+    let sample = "class Foo < Bar {}";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::classDecl(&tokens);
