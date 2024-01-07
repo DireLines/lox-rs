@@ -87,18 +87,11 @@ macro_rules! grammar_rule {
     //OR GROUP ( a | b | c )
     (@munch $tokens:ident ($($subtree:tt)|+) $($tail:tt)*) => {{
     let tokens = $tokens;
-    match grammar_rule!(@munch tokens $($subtree)+){
-    Ok((parsed_subtree_ast,leftover_tokens))=>{
-        //consume tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
-    },
-    Err(_)=>{
-        //parse without consuming tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
-        Ok(((None,parsed_tail_ast),tokens))
-    }
-   }
+    let mut subtree_ast = None;
+    let mut leftover_tokens = None;
+    let parsed_subtrees = vec![
+    $(grammar_rule!(@munch tokens $subtree), )*
+    ];
    }};
 
    //some token type not containing any data
@@ -120,8 +113,8 @@ macro_rules! grammar_rule {
     }
    }};
 
-   (@munch $tokens:ident ($parse_fn:path) $($tail:tt)*) => {{
     //RECURSIVE PARSING FUNCTION CALL
+    (@munch $tokens:ident ($parse_fn:path) $($tail:tt)*) => {{
     let tokens = $tokens;
     match $parse_fn(tokens) {
     Ok((parsed_subtree_ast,leftover_tokens))=>{
@@ -216,7 +209,7 @@ enum Declaration {
 #[derive(Debug, PartialEq, Clone)]
 struct Function {
     name: String,
-    parameters: Option<Vec<String>>,
+    parameters: Vec<String>,
     body: Box<Option<Statement>>,
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -311,7 +304,7 @@ impl Expression {
     grammar_rule!(Self::build_logic_or : logic_or  -> (Self::logic_and) ( OR (Self::logic_and) )* );
     grammar_rule!(Self::build_logic_and : logic_and -> (Self::equality) ( AND (Self::equality) )* );
     grammar_rule!(Self::build_equality : equality  -> (Self::comparison) ( ( BANG_EQUAL | EQUAL_EQUAL ) (Self::comparison) )* );
-    grammar_rule!(Self::build_comparison : comparison-> (Self::term) ( ( GREATER | GREATER_EQUAL | LESS | LESS_EQUAL ) (Self::term) )* );
+    grammar_rule!(Self::build_comparison : comparison -> (Self::term) ( ( GREATER | GREATER_EQUAL | LESS | LESS_EQUAL ) (Self::term) )* );
     grammar_rule!(Self::build_term : term      -> (Self::factor) ( ( MINUS | PLUS ) (Self::factor) )* );
     grammar_rule!(Self::build_factor : factor    -> (Self::unary) ( ( SLASH | STAR ) (Self::unary) )* );
 
