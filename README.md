@@ -22,4 +22,6 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
     - 2023-11-02 [video](https://www.youtube.com/watch?v=nMzMOvNKAw8&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=7)
     - 2023-11-16 (not recorded)
     - 2023-11-30 [video](https://www.youtube.com/watch?v=XLWXN_oMV5Y&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=8)
-    
+    - 2023-12-14 (not recorded)
+    - 2023-12-28 [video](https://www.youtube.com/watch?v=aV3sDT72nHw&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=9)
+    - 2024-01-11 [video](https://www.youtube.com/watch?v=Jds8-zvuL-o&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=10)
