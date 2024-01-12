@@ -4,12 +4,20 @@ use std::error::Error;
 use std::io::{BufRead, Write};
 
 macro_rules! grammar_rule {
-   ($make:path : $functionname:ident -> $($tail:tt)*) => {
+    ($functionname:ident -> $($tail:tt)*) => {
+        fn $functionname<'a>(
+            tokens: &'a [Token<'a>],
+        ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+            let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
+            Ok((body,tokens))
+        }
+       };
+   ($ast_build_fn:path : $functionname:ident -> $($tail:tt)*) => {
     fn $functionname<'a>(
         tokens: &'a [Token<'a>],
     ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
         let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-        Ok(($make(body),tokens))
+        Ok(($ast_build_fn(body),tokens))
     }
    };
 
@@ -37,9 +45,66 @@ macro_rules! grammar_rule {
     }
    }};
 
+    //REPEATED GROUP ( a b )*
+    (@munch $tokens:ident ($($subtree:tt)+)* $($tail:tt)*) => {{
+    let mut tokens = $tokens;
+    let mut results = vec![];
+    loop {
+        let subtree = grammar_rule!(@munch tokens $($subtree)+);
+        match subtree {
+            Ok((parsed_subtree_ast,leftover_tokens))=>{
+                //consume tokens for subtree
+                results.push(parsed_subtree_ast);
+                tokens = leftover_tokens;
+            },
+            Err(_)=>{
+                break;
+            }
+        }
+    }
+    let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
+    Ok(((results,parsed_tail_ast),tokens))
+    }};
+
+    //OR GROUP ( a | b | c )
+    (@munch $tokens:ident ($($variants:tt)|*) $($tail:tt)*) => {{
+        let x = 5;
+        let tokens = $tokens;
+        let subtree = grammar_rule!(@orgroup tokens $($variants)|*);
+        match subtree {
+            Ok((parsed_subtree_ast,leftover_tokens))=>{
+                //consume tokens for subtree
+                let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail:tt)*)?;
+                Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+            },
+            Err(e)=>{
+                //TODO: did not match any of the acceptable variants
+                Err(e)
+            }
+        }
+        }};
+    (@orgroup $tokens:ident $first_variant:tt | $($remaining_variants:tt)|*) => {{
+        let tokens = $tokens;
+        let subtree = grammar_rule!(@munch tokens $first_variant);
+        match subtree {
+            Ok(_)=>{
+                subtree
+            },
+            Err(_)=>{
+                grammar_rule!(@orgroup tokens $($remaining_variants)|*)
+            }
+        }
+    }};
+    (@orgroup $tokens:ident $first_variant:tt) => {{
+        grammar_rule!(@munch tokens $first_variant)
+    }};
+
+
+    //OPTIONAL GROUP ( a b )?
    (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
     let tokens = $tokens;
-    match grammar_rule!(@munch tokens $($subtree)+){
+    let subtree = grammar_rule!(@munch tokens $($subtree)+);
+    match subtree {
     Ok((parsed_subtree_ast,leftover_tokens))=>{
         //consume tokens for subtree
         let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail:tt)*)?;
@@ -70,6 +135,22 @@ macro_rules! grammar_rule {
         None => Err(LoxSyntaxError::UnexpectedEof)
     }
    }};
+
+    //RECURSIVE PARSING FUNCTION CALL
+    (@munch $tokens:ident [$parse_fn:path] $($tail:tt)*) => {{
+    let tokens = $tokens;
+    match $parse_fn(tokens) {
+    Ok((parsed_subtree_ast,leftover_tokens))=>{
+        //consume tokens for subtree
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
+        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+    },
+    Err(e)=>{
+        //pass along error from parsing subtree
+        Err(e)
+    }
+    }
+    }};
 
    (@munch $tokens:ident) => {{
     Ok(((),$tokens))
@@ -167,6 +248,46 @@ impl TryFrom<TokenType<'_>> for UnaryOperator {
 // std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> ;
 //}
 
+#[derive(Debug, PartialEq, Clone)]
+struct Function {
+    name: String,
+    parameters: Vec<String>,
+    body: Box<Option<Statement>>,
+}
+
+impl Statement {
+    // grammar_rule!(statement -> ( (Self::exprStmt) | (Self::forStmt) | (Self::ifStmt) | (Self::printStmt) | (Self::returnStmt) | (Self::whileStmt) | (Self::block) ));
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum Statement {
+    ExprStmt,
+    ForStmt,
+    IfStmt,
+    PrintStmt,
+    ReturnStmt,
+    WhileStmt,
+    Block,
+}
+impl Function {
+    // fn build_function(
+    //     data: (
+    //         &str,
+    //         (
+    //             Option<(&str, (Vec<(&str, ())>, ()))>,
+    //             (Option<Statement>, ()),
+    //         ),
+    //     ),
+    // ) -> Self {
+    //     let (name, (params, (stmt, _))) = data;
+    //     Function {
+    //         name: name.to_string(),
+    //         parameters: params,
+    //         body: Box::new(stmt),
+    //     }
+    // }
+    // grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN Statement::block[]);
+}
 impl Declaration {
     // grammar_rule!(classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
     fn class_declaration(data: (&str, (Option<(&str, ())>, ()))) -> Self {
@@ -177,7 +298,7 @@ impl Declaration {
             body: vec![],
         }
     }
-    grammar_rule!(Self::class_declaration : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )?);
+    // grammar_rule!(Self::class_declaration : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE (Function::function[])* RIGHT_BRACE);
     // IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
 }
 
@@ -907,40 +1028,40 @@ fn test_syntax_error_incomplete_binary() {
     assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
 }
 
-#[test]
-fn test_parse_class_decl_no_inherit() {
-    let sample = "class Foo";
-    let mut scanner = Scanner::new(sample);
-    let tokens = scanner.collect::<Vec<_>>();
-    let x = Declaration::classDecl(&tokens);
-    assert_eq!(
-        x,
-        Ok((
-            Declaration::ClassDecl {
-                name: String::from("Foo"),
-                parent_name: None,
-                body: vec![]
-            },
-            &[][..]
-        ))
-    );
-}
+// #[test]
+// fn test_parse_class_decl_no_inherit() {
+//     let sample = "class Foo";
+//     let mut scanner = Scanner::new(sample);
+//     let tokens = scanner.collect::<Vec<_>>();
+//     let x = Declaration::classDecl(&tokens);
+//     assert_eq!(
+//         x,
+//         Ok((
+//             Declaration::ClassDecl {
+//                 name: String::from("Foo"),
+//                 parent_name: None,
+//                 body: vec![]
+//             },
+//             &[][..]
+//         ))
+//     );
+// }
 
-#[test]
-fn test_parse_class_decl_inherit() {
-    let sample = "class Foo < Bar";
-    let mut scanner = Scanner::new(sample);
-    let tokens = scanner.collect::<Vec<_>>();
-    let x = Declaration::classDecl(&tokens);
-    assert_eq!(
-        x,
-        Ok((
-            Declaration::ClassDecl {
-                name: String::from("Foo"),
-                parent_name: Some(String::from("Bar")),
-                body: vec![]
-            },
-            &[][..]
-        ))
-    );
-}
+// #[test]
+// fn test_parse_class_decl_inherit() {
+//     let sample = "class Foo < Bar";
+//     let mut scanner = Scanner::new(sample);
+//     let tokens = scanner.collect::<Vec<_>>();
+//     let x = Declaration::classDecl(&tokens);
+//     assert_eq!(
+//         x,
+//         Ok((
+//             Declaration::ClassDecl {
+//                 name: String::from("Foo"),
+//                 parent_name: Some(String::from("Bar")),
+//                 body: vec![]
+//             },
+//             &[][..]
+//         ))
+//     );
+// }
