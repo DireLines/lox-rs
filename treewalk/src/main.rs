@@ -122,7 +122,7 @@ macro_rules! grammar_rule {
         match subtree {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
-                let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail:tt)*)?;
+                let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
                 Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
             },
             Err(e)=>{
@@ -144,7 +144,7 @@ macro_rules! grammar_rule {
         }
     }};
     (@orgroup $tokens:ident $first_variant:tt) => {{
-        grammar_rule!(@munch tokens $first_variant)
+        grammar_rule!(@munch $tokens $first_variant)
     }};
 
 
