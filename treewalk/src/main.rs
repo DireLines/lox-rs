@@ -274,23 +274,6 @@ enum Declaration {
     Statement,
 }
 
-impl TryFrom<TokenType<'_>> for UnaryOperator {
-    type Error = ();
-    fn try_from(value: TokenType) -> std::result::Result<Self, Self::Error> {
-        use crate::TokenType::*;
-        match value {
-            MINUS => Ok(Self::MINUS),
-            BANG => Ok(Self::BANG),
-            _ => Err(()),
-        }
-    }
-}
-
-//trait Parse {
-//fn parse<'a>(tokens: &'a [Tokens<'a>]) ->
-// std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> ;
-//}
-
 #[derive(Debug, PartialEq, Clone)]
 enum Statement {
     ExprStmt,
@@ -302,6 +285,14 @@ enum Statement {
     Block,
 }
 impl Statement {
+    grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
+    grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
+    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN ( [Declaration::varDecl] | [Statement::exprStmt] | SEMICOLON ) ( [Expression::expression] )? SEMICOLON ([Expression::expression])? LEFT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
+    grammar_rule!(Self::build_printStmt : printStmt -> PRINT [Expression::expression] SEMICOLON );
+    grammar_rule!(Self::build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMICOLON );
+    grammar_rule!(Self::build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
     fn build_exprStmt(data: ()) -> Self {
         unimplemented!()
     }
@@ -323,14 +314,6 @@ impl Statement {
     fn build_block(data: ()) -> Self {
         unimplemented!()
     }
-    grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
-    grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
-    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN ( [Declaration::varDecl] | [Statement::exprStmt] | SEMICOLON ) ([Expression::expression])? SEMICOLON ([Expression::expression])? LEFT_PAREN [Statement::statement] );
-    grammar_rule!(Self::build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
-    grammar_rule!(Self::build_printStmt : printStmt -> PRINT [Expression::expression] SEMICOLON );
-    grammar_rule!(Self::build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMICOLON );
-    grammar_rule!(Self::build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
-    grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
 }
 #[derive(Debug, PartialEq, Clone)]
 struct Function {
@@ -338,7 +321,6 @@ struct Function {
     parameters: Vec<String>,
     body: Box<Option<Statement>>,
 }
-
 impl Function {
     fn build_function(
         data: (
@@ -366,6 +348,10 @@ impl Function {
     grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
 impl Declaration {
+    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
+    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
+    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
+    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
     fn build_classDecl(data: (&str, (Option<(&str, ())>, ()))) -> Self {
         let (ident, (parent_name, _)) = data;
         Self::ClassDecl {
@@ -380,13 +366,20 @@ impl Declaration {
     fn build_varDecl(data: ()) -> Self {
         unimplemented!()
     }
-    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
-    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
-    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
 }
 
 impl Expression {
+    grammar_rule!(expression -> [Expression::assignment] );
+    grammar_rule!(Self::build_assignment : assignment -> ( ( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | [Expression::logic_or] ) );
+    grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
+    grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
+    grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( BANG_EQUAL | EQUAL_EQUAL ) [Expression::comparison] )* );
+    grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( GREATER | GREATER_EQUAL | LESS | LESS_EQUAL ) [Expression::term] )* );
+    grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( MINUS | PLUS ) [Expression::factor] )* );
+    grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( SLASH | STAR ) [Expression::unary] )* );
+    grammar_rule!(Self::build_unary : unary -> (( BANG | MINUS ) [Expression::unary] | [Expression::call] ));
+    grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN | DOT IDENTIFIER ) )* );
+    grammar_rule!(Self::build_primary : primary -> (TRUE | FALSE | NIL | THIS | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
     fn build_assignment(data: ()) -> Self {
         unimplemented!()
     }
@@ -417,17 +410,6 @@ impl Expression {
     fn build_primary(data: ()) -> Self {
         unimplemented!()
     }
-    grammar_rule!(expression -> [Expression::assignment] );
-    grammar_rule!(Self::build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | logic_or ));
-    grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
-    grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
-    grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
-    grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
-    grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
-    grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
-    grammar_rule!(Self::build_unary : unary -> ( {BANG} | {MINUS} ) [Expression::unary] | call );
-    grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )*)? RIGHT_PAREN | DOT IDENTIFIER) )* );
-    grammar_rule!(Self::build_primary : primary -> ({TRUE} | {FALSE} | {NIL} | {THIS} | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -968,7 +950,7 @@ fn test_parse_expr() {
     let sample = "(3)";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse_unary(&tokens);
+    let x = Expression::unary(&tokens);
     assert_eq!(
         x.unwrap().0,
         Expression::GROUPING {
@@ -982,7 +964,7 @@ fn test_parse_binary() {
     let sample = "3 * 4";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x.unwrap().0,
         Expression::BINARY {
@@ -998,7 +980,7 @@ fn test_parse_binary_assoc() {
     let sample = "3 * 4 * 5";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     use crate::Expression::*;
     assert_eq!(
         x.unwrap().0,
@@ -1019,7 +1001,7 @@ fn test_syntax_error_unexpected() {
     let sample = "/";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -1035,7 +1017,7 @@ fn test_syntax_error_unexpected_paren() {
     let sample = ")";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -1051,7 +1033,7 @@ fn test_syntax_error_missing_paren() {
     let sample = "(1 2";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -1067,44 +1049,44 @@ fn test_syntax_error_incomplete_binary() {
     let sample = "3 +";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::parse(&tokens);
+    let x = Expression::expression(&tokens);
     assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
 }
 
-// #[test]
-// fn test_parse_class_decl_no_inherit() {
-//     let sample = "class Foo";
-//     let mut scanner = Scanner::new(sample);
-//     let tokens = scanner.collect::<Vec<_>>();
-//     let x = Declaration::classDecl(&tokens);
-//     assert_eq!(
-//         x,
-//         Ok((
-//             Declaration::ClassDecl {
-//                 name: String::from("Foo"),
-//                 parent_name: None,
-//                 body: vec![]
-//             },
-//             &[][..]
-//         ))
-//     );
-// }
+#[test]
+fn test_parse_class_decl_no_inherit() {
+    let sample = "class Foo";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Declaration::classDecl(&tokens);
+    assert_eq!(
+        x,
+        Ok((
+            Declaration::ClassDecl {
+                name: String::from("Foo"),
+                parent_name: None,
+                body: vec![]
+            },
+            &[][..]
+        ))
+    );
+}
 
-// #[test]
-// fn test_parse_class_decl_inherit() {
-//     let sample = "class Foo < Bar";
-//     let mut scanner = Scanner::new(sample);
-//     let tokens = scanner.collect::<Vec<_>>();
-//     let x = Declaration::classDecl(&tokens);
-//     assert_eq!(
-//         x,
-//         Ok((
-//             Declaration::ClassDecl {
-//                 name: String::from("Foo"),
-//                 parent_name: Some(String::from("Bar")),
-//                 body: vec![]
-//             },
-//             &[][..]
-//         ))
-//     );
-// }
+#[test]
+fn test_parse_class_decl_inherit() {
+    let sample = "class Foo < Bar";
+    let mut scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Declaration::classDecl(&tokens);
+    assert_eq!(
+        x,
+        Ok((
+            Declaration::ClassDecl {
+                name: String::from("Foo"),
+                parent_name: Some(String::from("Bar")),
+                body: vec![]
+            },
+            &[][..]
+        ))
+    );
+}
