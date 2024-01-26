@@ -231,37 +231,6 @@ macro_rules! grammar_rule {
    }}
 }
 
-macro_rules! make_parse_binary_group {
-    ( $function_name:ident, $constituent_function_name:ident, $comparison_function:expr) => {
-        fn $function_name<'a>(
-            tokens: &'a [Token<'a>],
-        ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-            let (mut expr, mut tokens) = Self::$constituent_function_name(tokens)?;
-
-            while let Some(operator) = tokens.get(0).and_then(|t| $comparison_function(t.token)) {
-                let rest = &tokens[1..];
-                let (unary, tok) = Self::$constituent_function_name(rest)?;
-                tokens = tok;
-                expr = Self::BINARY {
-                    left: Box::new(expr),
-                    operator,
-                    right: Box::new(unary),
-                };
-            }
-
-            Ok((expr, tokens))
-        }
-    };
-}
-
-macro_rules! try_match_patterns {($($tok:tt), *) => {
-    |value| match value {
-        $(TokenType::$tok => Some(BinaryOperator::$tok),)*
-        _ => None
-    }
-}
-}
-
 #[derive(Debug, PartialEq, Clone)]
 enum LoxSyntaxError<'a> {
     UnexpectedEof,
@@ -333,14 +302,35 @@ enum Statement {
     Block,
 }
 impl Statement {
+    fn build_exprStmt(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_forStmt(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_ifStmt(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_printStmt(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_returnStmt(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_whileStmt(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_block(data: ()) -> Self {
+        unimplemented!()
+    }
     grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
-    grammar_rule!(build_exprStmt : exprStmt -> [Expression::expression] SEMI );
-    grammar_rule!(build_forStmt : forStmt -> FOR RIGHT_PAREN ( [Declaration::varDecl] | [Expression::exprStmt] | SEMI ) ([Expression::expression])? SEMI ([Expression::expression])? LEFT_PAREN [Statement::statement] );
-    grammar_rule!(build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
-    grammar_rule!(build_printStmt : printStmt -> PRINT [Expression::expression] SEMI );
-    grammar_rule!(build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMI );
-    grammar_rule!(build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
-    grammar_rule!(build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
+    grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
+    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN ( [Declaration::varDecl] | [Statement::exprStmt] | SEMICOLON ) ([Expression::expression])? SEMICOLON ([Expression::expression])? LEFT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
+    grammar_rule!(Self::build_printStmt : printStmt -> PRINT [Expression::expression] SEMICOLON );
+    grammar_rule!(Self::build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMICOLON );
+    grammar_rule!(Self::build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
 }
 #[derive(Debug, PartialEq, Clone)]
 struct Function {
@@ -376,10 +366,6 @@ impl Function {
     grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
 impl Declaration {
-    grammar_rule!(build_declaration: declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
-    grammar_rule!(build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    grammar_rule!(build_funDecl: funDecl -> FUN [Function::function] );
-    grammar_rule!(build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMI );
     fn build_classDecl(data: (&str, (Option<(&str, ())>, ()))) -> Self {
         let (ident, (parent_name, _)) = data;
         Self::ClassDecl {
@@ -388,20 +374,60 @@ impl Declaration {
             body: vec![],
         }
     }
+    fn build_funDecl(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_varDecl(data: ()) -> Self {
+        unimplemented!()
+    }
+    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
+    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
+    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
+    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
 }
 
 impl Expression {
+    fn build_assignment(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_logic_or(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_logic_and(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_equality(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_comparison(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_term(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_factor(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_unary(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_call(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_primary(data: ()) -> Self {
+        unimplemented!()
+    }
     grammar_rule!(expression -> [Expression::assignment] );
-    grammar_rule!(build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | logic_or ));
-    grammar_rule!(build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
-    grammar_rule!(build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
-    grammar_rule!(build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
-    grammar_rule!(build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
-    grammar_rule!(build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
-    grammar_rule!(build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
-    grammar_rule!(build_unary : unary -> ( {BANG} | {MINUS} ) [Expression::unary] | call );
-    grammar_rule!(build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )*)? RIGHT_PAREN | DOT IDENTIFIER) )* );
-    grammar_rule!(build_primary : primary -> ({TRUE} | {FALSE} | {NIL} | {THIS} | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
+    grammar_rule!(Self::build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | logic_or ));
+    grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
+    grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
+    grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
+    grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
+    grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
+    grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
+    grammar_rule!(Self::build_unary : unary -> ( {BANG} | {MINUS} ) [Expression::unary] | call );
+    grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )*)? RIGHT_PAREN | DOT IDENTIFIER) )* );
+    grammar_rule!(Self::build_primary : primary -> ({TRUE} | {FALSE} | {NIL} | {THIS} | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
 }
 
 #[derive(Debug, PartialEq, Clone)]
