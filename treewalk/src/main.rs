@@ -45,6 +45,54 @@ macro_rules! grammar_rule {
     }
    }};
 
+   (@munch $tokens:ident NUMBER $($tail:tt)*) => {{
+    match $tokens.get(0){
+        Some(first_token) =>{
+            let tokens = &$tokens[1..];
+            match first_token.token {
+                TokenType::NUMBER(value) => {
+                    match grammar_rule!(@munch tokens $($tail)*) {
+                        Ok((parsed_tail_ast,tokens)) => {
+                            Ok::<_, LoxSyntaxError>(((value,parsed_tail_ast),tokens))
+                        },
+                        Err(e) =>Err(e)
+                    }
+                }
+                _ =>  Err(LoxSyntaxError::UnexpectedToken{
+                    lexeme: first_token.lexeme,
+                    line: first_token.line,
+                    message: "Unexpected token",
+            })
+            }
+        },
+        None => Err(LoxSyntaxError::UnexpectedEof)
+    }
+   }};
+
+   (@munch $tokens:ident STRING $($tail:tt)*) => {{
+    match $tokens.get(0){
+        Some(first_token) =>{
+            let tokens = &$tokens[1..];
+            match first_token.token {
+                TokenType::STRING(value) => {
+                    match grammar_rule!(@munch tokens $($tail)*) {
+                        Ok((parsed_tail_ast,tokens)) => {
+                            Ok::<_, LoxSyntaxError>(((value,parsed_tail_ast),tokens))
+                        },
+                        Err(e) =>Err(e)
+                    }
+                }
+                _ =>  Err(LoxSyntaxError::UnexpectedToken{
+                    lexeme: first_token.lexeme,
+                    line: first_token.line,
+                    message: "Unexpected token",
+            })
+            }
+        },
+        None => Err(LoxSyntaxError::UnexpectedEof)
+    }
+   }};
+
     //REPEATED GROUP ( a b )*
     (@munch $tokens:ident ($($subtree:tt)+)* $($tail:tt)*) => {{
     let mut tokens = $tokens;
@@ -107,17 +155,43 @@ macro_rules! grammar_rule {
     match subtree {
     Ok((parsed_subtree_ast,leftover_tokens))=>{
         //consume tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail:tt)*)?;
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
         Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
     },
     Err(_)=>{
         //parse without consuming tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail:tt)*)?;
+        let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
         Ok(((None,parsed_tail_ast),tokens))
     }
    }
    }};
 
+   //generic token but capture which token it was
+   (@munch $tokens:ident {$tt:ident} $($tail:tt)*) => {{
+    match $tokens.get(0) {
+        Some(first_token)=>{
+            if first_token.token == TokenType::$tt {
+                let tokens = &$tokens[1..];
+                let subtree = grammar_rule!(@munch tokens $($tail)*);
+                match subtree {
+                    Ok((parsed_tail_ast,tokens)) => {
+                        Ok::<_, LoxSyntaxError>((($tt,parsed_tail_ast),tokens))
+                    },
+                    Err(e) =>Err(e)
+                }
+            } else {
+                Err(LoxSyntaxError::UnexpectedToken{
+                        lexeme: first_token.lexeme,
+                        line: first_token.line,
+                        message: "Unexpected token",
+                })
+            }
+        },
+        None => Err(LoxSyntaxError::UnexpectedEof)
+    }
+   }};
+
+   //generic token (do not record token type)
    (@munch $tokens:ident $tt:ident $($tail:tt)*) => {{
     match $tokens.get(0) {
         Some(first_token)=>{
@@ -249,17 +323,6 @@ impl TryFrom<TokenType<'_>> for UnaryOperator {
 //}
 
 #[derive(Debug, PartialEq, Clone)]
-struct Function {
-    name: String,
-    parameters: Vec<String>,
-    body: Box<Option<Statement>>,
-}
-
-impl Statement {
-    // grammar_rule!(statement -> ( (Self::exprStmt) | (Self::forStmt) | (Self::ifStmt) | (Self::printStmt) | (Self::returnStmt) | (Self::whileStmt) | (Self::block) ));
-}
-
-#[derive(Debug, PartialEq, Clone)]
 enum Statement {
     ExprStmt,
     ForStmt,
@@ -269,28 +332,55 @@ enum Statement {
     WhileStmt,
     Block,
 }
+impl Statement {
+    grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
+    grammar_rule!(build_exprStmt : exprStmt -> [Expression::expression] SEMI );
+    grammar_rule!(build_forStmt : forStmt -> FOR RIGHT_PAREN ( [Declaration::varDecl] | [Expression::exprStmt] | SEMI ) ([Expression::expression])? SEMI ([Expression::expression])? LEFT_PAREN [Statement::statement] );
+    grammar_rule!(build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
+    grammar_rule!(build_printStmt : printStmt -> PRINT [Expression::expression] SEMI );
+    grammar_rule!(build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMI );
+    grammar_rule!(build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
+    grammar_rule!(build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
+}
+#[derive(Debug, PartialEq, Clone)]
+struct Function {
+    name: String,
+    parameters: Vec<String>,
+    body: Box<Option<Statement>>,
+}
+
 impl Function {
-    // fn build_function(
-    //     data: (
-    //         &str,
-    //         (
-    //             Option<(&str, (Vec<(&str, ())>, ()))>,
-    //             (Option<Statement>, ()),
-    //         ),
-    //     ),
-    // ) -> Self {
-    //     let (name, (params, (stmt, _))) = data;
-    //     Function {
-    //         name: name.to_string(),
-    //         parameters: params,
-    //         body: Box::new(stmt),
-    //     }
-    // }
-    // grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN Statement::block[]);
+    fn build_function(
+        data: (
+            &str,
+            (
+                Option<(&str, (Vec<(&str, ())>, ()))>,
+                (Option<Statement>, ()),
+            ),
+        ),
+    ) -> Self {
+        let (name, (params, (stmt, ()))) = data;
+        let params = if let Some((first_param, (other_params, ()))) = params {
+            let mut params: Vec<String> = other_params.iter().map(|e| e.0.to_owned()).collect();
+            params.insert(0, first_param.to_owned());
+            params
+        } else {
+            Vec::new()
+        };
+        Function {
+            name: name.to_string(),
+            parameters: params,
+            body: Box::new(stmt),
+        }
+    }
+    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
 impl Declaration {
-    // grammar_rule!(classDecl -> "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
-    fn class_declaration(data: (&str, (Option<(&str, ())>, ()))) -> Self {
+    grammar_rule!(build_declaration: declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
+    grammar_rule!(build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
+    grammar_rule!(build_funDecl: funDecl -> FUN [Function::function] );
+    grammar_rule!(build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMI );
+    fn build_classDecl(data: (&str, (Option<(&str, ())>, ()))) -> Self {
         let (ident, (parent_name, _)) = data;
         Self::ClassDecl {
             name: ident.to_string(),
@@ -298,93 +388,20 @@ impl Declaration {
             body: vec![],
         }
     }
-    // grammar_rule!(Self::class_declaration : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE (Function::function[])* RIGHT_BRACE);
-    // IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}" ;);
 }
 
 impl Expression {
-    fn parse<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        Self::parse_equality(tokens)
-    }
-    // pay no attention to the man behind the curtain!
-    //fn parse_many<'a>(tokens: &'a, item: xxx, sep: yyyy)
-
-    make_parse_binary_group!(
-        parse_equality,
-        parse_comparison,
-        try_match_patterns!(EQUAL_EQUAL, BANG_EQUAL)
-    );
-    make_parse_binary_group!(
-        parse_comparison,
-        parse_term,
-        try_match_patterns!(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)
-    );
-    make_parse_binary_group!(parse_term, parse_factor, try_match_patterns!(PLUS, MINUS));
-    make_parse_binary_group!(parse_factor, parse_unary, try_match_patterns!(SLASH, STAR));
-
-    fn parse_unary<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let t = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-        if let Ok(operator) = UnaryOperator::try_from(t.token) {
-            let rest = &tokens[1..];
-            let (expr, tokens) = Self::parse_unary(rest)?;
-            Ok((
-                Self::UNARY {
-                    operator,
-                    right: Box::new(expr),
-                },
-                tokens,
-            ))
-        } else {
-            Self::parse_primary(tokens)
-        }
-    }
-
-    fn parse_primary<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let t = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-        use crate::TokenType::*;
-        match t.token {
-            LEFT_PAREN => {
-                let (expr, tokens) = Self::parse(&tokens[1..])?;
-                let token_after = tokens.get(0).ok_or(LoxSyntaxError::UnexpectedEof)?;
-                if token_after.token != RIGHT_PAREN {
-                    return Err(LoxSyntaxError::UnexpectedToken {
-                        lexeme: token_after.lexeme,
-                        line: token_after.line,
-                        message: "missing right paren",
-                    });
-                }
-                return Ok((
-                    Self::GROUPING {
-                        expression: Box::new(expr),
-                    },
-                    &tokens[1..],
-                ));
-            }
-            RIGHT_PAREN => {
-                return Err(LoxSyntaxError::UnexpectedToken {
-                    lexeme: t.lexeme,
-                    line: t.line,
-                    message: "right paren with no left paren",
-                });
-            }
-            NUMBER(n) => Ok((Self::NUMBER(n), &tokens[1..])),
-            STRING(s) => Ok((Self::STRING(String::from(s)), &tokens[1..])),
-            TRUE => Ok((Self::BOOL(true), &tokens[1..])),
-            FALSE => Ok((Self::BOOL(false), &tokens[1..])),
-            NIL => Ok((Self::NIL, &tokens[1..])),
-            _ => Err(LoxSyntaxError::UnexpectedToken {
-                lexeme: t.lexeme,
-                line: t.line,
-                message: "Unexpected token",
-            }),
-        }
-    }
+    grammar_rule!(expression -> [Expression::assignment] );
+    grammar_rule!(build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | logic_or ));
+    grammar_rule!(build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
+    grammar_rule!(build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
+    grammar_rule!(build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
+    grammar_rule!(build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
+    grammar_rule!(build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
+    grammar_rule!(build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
+    grammar_rule!(build_unary : unary -> ( {BANG} | {MINUS} ) [Expression::unary] | call );
+    grammar_rule!(build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )*)? RIGHT_PAREN | DOT IDENTIFIER) )* );
+    grammar_rule!(build_primary : primary -> ({TRUE} | {FALSE} | {NIL} | {THIS} | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
 }
 
 #[derive(Debug, PartialEq, Clone)]
