@@ -175,7 +175,7 @@ macro_rules! grammar_rule {
                 let subtree = grammar_rule!(@munch tokens $($tail)*);
                 match subtree {
                     Ok((parsed_tail_ast,tokens)) => {
-                        Ok::<_, LoxSyntaxError>((($tt,parsed_tail_ast),tokens))
+                        Ok::<_, LoxSyntaxError>(((TokenType::$tt,parsed_tail_ast),tokens))
                     },
                     Err(e) =>Err(e)
                 }
@@ -370,16 +370,16 @@ impl Declaration {
 
 impl Expression {
     grammar_rule!(expression -> [Expression::assignment] );
-    grammar_rule!(Self::build_assignment : assignment -> ( ( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | [Expression::logic_or] ) );
+    grammar_rule!(Self::build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | [Expression::logic_or] ));
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
-    grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( BANG_EQUAL | EQUAL_EQUAL ) [Expression::comparison] )* );
-    grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( GREATER | GREATER_EQUAL | LESS | LESS_EQUAL ) [Expression::term] )* );
-    grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( MINUS | PLUS ) [Expression::factor] )* );
-    grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( SLASH | STAR ) [Expression::unary] )* );
-    grammar_rule!(Self::build_unary : unary -> (( BANG | MINUS ) [Expression::unary] | [Expression::call] ));
-    grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN | DOT IDENTIFIER ) )* );
-    grammar_rule!(Self::build_primary : primary -> (TRUE | FALSE | NIL | THIS | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
+    grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
+    grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
+    grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
+    grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
+    grammar_rule!(Self::build_unary : unary -> (( {BANG} | {MINUS} ) [Expression::unary] | [Expression::call] ));
+    grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN | DOT IDENTIFIER) )* );
+    grammar_rule!(Self::build_primary : primary -> ({TRUE} | {FALSE} | {NIL} | {THIS} | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
     fn build_assignment(data: ()) -> Self {
         unimplemented!()
     }
