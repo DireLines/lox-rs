@@ -1,4 +1,5 @@
 #![allow(non_camel_case_types)]
+#![allow(non_snake_case)] // <- bad
 
 use phf::phf_map;
 use std::env::args;
