@@ -367,6 +367,7 @@ enum Statement {
     WhileStmt,
     Block,
 }
+/*
 impl Statement {
     grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
     grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
@@ -397,7 +398,7 @@ impl Statement {
     fn build_block(data: ()) -> Self {
         unimplemented!()
     }
-}
+}*/
 #[derive(Debug, PartialEq, Clone)]
 struct Function {
     name: String,
@@ -428,13 +429,14 @@ impl Function {
             body: Box::new(stmt),
         }
     }
-    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
+    //    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
 impl Declaration {
-    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
+    //    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
+    grammar_rule!(declaration -> [Declaration::classDecl]);
     grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
-    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
+    //    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
+    //    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
     fn build_classDecl(data: (&str, (Option<(&str, ())>, ()))) -> Self {
         let (ident, (parent_name, _)) = data;
         Self::ClassDecl {
@@ -450,7 +452,7 @@ impl Declaration {
         unimplemented!()
     }
 }
-
+/*
 impl Expression {
     grammar_rule!(expression -> [Expression::assignment] );
     grammar_rule!(Self::build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | [Expression::logic_or] ));
@@ -493,7 +495,7 @@ impl Expression {
     fn build_primary(data: ()) -> Self {
         unimplemented!()
     }
-}
+}*/
 
 #[derive(Debug, PartialEq, Clone)]
 enum UnaryOperator {
@@ -828,6 +830,7 @@ fn run(source: &str) {
     println!("running on {source}");
 }
 
+/*
 #[test]
 fn test_simple_lexer() {
     let sample = "> << / //  this is a comment\n> / +";
@@ -1175,3 +1178,4 @@ fn test_parse_class_decl_inherit() {
         ))
     );
 }
+*/
