@@ -29,6 +29,16 @@ impl Done for () {
     fn done(self) {}
 }
 
+impl<T, I: Prepend<T>, E> Prepend<T> for ::std::result::Result<I, E> {
+    type Out = std::result::Result<<I as Prepend<T>>::Out, E>;
+    fn prep(self, item: T) -> Self::Out {
+        match self {
+            Ok(v) => Ok(v.prep(item)),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 /// Finalize Heterogenous collection and get back the results
 ///
 /// Since we are treating collection of size 1 in a special way: `(T, ())` we want
