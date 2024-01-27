@@ -500,6 +500,7 @@ enum UnaryOperator {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
 enum BinaryOperator {
     MINUS,
     PLUS,
@@ -789,6 +790,7 @@ struct Token<'a> {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[rustfmt::skip]
+#[allow(non_camel_case_types)]
 enum TokenType<'a> {
     // Single-character tokens.
     LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
