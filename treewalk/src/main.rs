@@ -110,7 +110,7 @@ macro_rules! grammar_rule {
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
             let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-            Ok(($ast_build_fn(body),tokens))
+            Ok(($ast_build_fn(body.done()),tokens))
         }
     };
 
@@ -129,7 +129,7 @@ macro_rules! grammar_rule {
                 TokenType::IDENTIFIER(ident) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((ident,parsed_tail_ast),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(ident)),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -153,7 +153,7 @@ macro_rules! grammar_rule {
                 TokenType::NUMBER(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((value,parsed_tail_ast),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(value)),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -177,7 +177,7 @@ macro_rules! grammar_rule {
                 TokenType::STRING(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((value,parsed_tail_ast),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(value)),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -202,7 +202,7 @@ macro_rules! grammar_rule {
         match subtree {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
-                results.push(parsed_subtree_ast);
+                results.push(parsed_subtree_ast.done());
                 tokens = leftover_tokens;
             },
             Err(_)=>{
@@ -210,8 +210,8 @@ macro_rules! grammar_rule {
             }
         }
     }
-    let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
-    Ok(((results,parsed_tail_ast),tokens))
+    let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?; // <- bad
+    Ok((parsed_tail_ast.prep(results),tokens))
     }};
 
     //OR GROUP ( a | b | c )
@@ -223,7 +223,7 @@ macro_rules! grammar_rule {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
                 let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-                Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+                Ok((parsed_tail_ast.prep(parsed_subtree_ast), tokens))
             },
             Err(e)=>{
                 //TODO: did not match any of the acceptable variants
@@ -231,6 +231,8 @@ macro_rules! grammar_rule {
             }
         }
         }};
+
+    // this handles continuation in or group
     (@orgroup $tokens:ident $first_variant:tt | $($remaining_variants:tt)|*) => {{
         let tokens = $tokens;
         let subtree = grammar_rule!(@munch tokens $first_variant);
@@ -248,7 +250,7 @@ macro_rules! grammar_rule {
     }};
 
 
-    //OPTIONAL GROUP ( a b )?
+    // OPTIONAL GROUP ( a b )?
    (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
     let tokens = $tokens;
     let subtree = grammar_rule!(@munch tokens $($subtree)+);
@@ -256,12 +258,12 @@ macro_rules! grammar_rule {
     Ok((parsed_subtree_ast,leftover_tokens))=>{
         //consume tokens for subtree
         let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+        Ok(((parsed_tail_ast.prep(  Some(parsed_subtree_ast.done()) )),tokens))
     },
     Err(_)=>{
         //parse without consuming tokens for subtree
         let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
-        Ok(((None,parsed_tail_ast),tokens))
+        Ok(((parsed_tail_ast.prep(None)),tokens))
     }
    }
    }};
@@ -275,7 +277,7 @@ macro_rules! grammar_rule {
                 let subtree = grammar_rule!(@munch tokens $($tail)*);
                 match subtree {
                     Ok((parsed_tail_ast,tokens)) => {
-                        Ok::<_, LoxSyntaxError>(((TokenType::$tt,parsed_tail_ast),tokens))
+                        Ok::<_, LoxSyntaxError>((parsed_tail_ast.prep(TokenType::$tt),tokens))
                     },
                     Err(e) =>Err(e)
                 }
@@ -312,18 +314,18 @@ macro_rules! grammar_rule {
 
     //RECURSIVE PARSING FUNCTION CALL
     (@munch $tokens:ident [$parse_fn:path] $($tail:tt)*) => {{
-    let tokens = $tokens;
-    match $parse_fn(tokens) {
-    Ok((parsed_subtree_ast,leftover_tokens))=>{
-        //consume tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
-    },
-    Err(e)=>{
-        //pass along error from parsing subtree
-        Err(e)
-    }
-    }
+        let tokens = $tokens;
+        match $parse_fn(tokens) {
+            Ok((parsed_subtree_ast,leftover_tokens))=>{
+                //consume tokens for subtree
+                let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
+                Ok((parsed_tail_ast.prep(parsed_subtree_ast), tokens))
+            },
+            Err(e)=>{
+                //pass along error from parsing subtree
+                Err(e)
+            }
+        }
     }};
 
    (@munch $tokens:ident) => {{
@@ -452,23 +454,22 @@ impl Function {
 impl Function {
     fn function<'a>(
         tokens: &'a [Token<'a>],
-    ) -> ::std::result::Result<((), &'a [Token<'a>]), LoxSyntaxError<'a>> {
-        Ok(((), tokens))
+    ) -> ::std::result::Result<(Function, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        Ok((todo!(), tokens))
     }
 }
 
 impl Declaration {
     //    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
     //    grammar_rule!(declaration -> [Declaration::classDecl]);
-    //    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE  RIGHT_BRACE);
+    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
     //    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
     //    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
-    fn build_classDecl(data: (&str, (Option<(&str, ())>, ()))) -> Self {
-        let (ident, (parent_name, _)) = data;
+    fn build_classDecl(data: (&str, Option<&str>, Vec<Function>)) -> Self {
+        let (ident, parent_name, body) = data;
         Self::ClassDecl {
             name: ident.to_string(),
-            parent_name: parent_name.map(|s| s.0.to_string()),
+            parent_name: parent_name.map(|s| s.to_string()),
             body: vec![],
         }
     }
