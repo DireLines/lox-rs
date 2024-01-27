@@ -224,7 +224,7 @@ macro_rules! grammar_rule {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
                 let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-                Ok((parsed_tail_ast.prep(parsed_subtree_ast), tokens))
+                Ok((parsed_tail_ast.prep(parsed_subtree_ast.done()), tokens))
             },
             Err(e)=>{
                 //TODO: did not match any of the acceptable variants
@@ -387,38 +387,52 @@ enum Statement {
     WhileStmt,
     Block,
 }
-/*
+
 impl Statement {
-    grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
+    grammar_rule!(id: statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
     grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
-    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN ( [Declaration::varDecl] | [Statement::exprStmt] | SEMICOLON ) ( [Expression::expression] )? SEMICOLON ([Expression::expression])? LEFT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN
+        ( [Statement::varDecl] | [Statement::exprStmt] | [Statement::emptyStmt] )
+        ( [Expression::expression] )? SEMICOLON
+        ( [Expression::expression] )? LEFT_PAREN [Statement::statement] );
     grammar_rule!(Self::build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
     grammar_rule!(Self::build_printStmt : printStmt -> PRINT [Expression::expression] SEMICOLON );
     grammar_rule!(Self::build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMICOLON );
     grammar_rule!(Self::build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
     grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
-    fn build_exprStmt(data: ()) -> Self {
+    grammar_rule!(Self::build_empty_stmt : emptyStmt -> SEMICOLON);
+
+    fn build_empty_stmt(data: ()) -> Self {
+        todo!()
+    }
+    fn build_exprStmt(data: Expression) -> Self {
         unimplemented!()
     }
-    fn build_forStmt(data: ()) -> Self {
+    fn varDecl<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        todo!()
+    }
+
+    fn build_forStmt(data: (Statement, Option<Expression>, Option<Expression>, Statement)) -> Self {
         unimplemented!()
     }
-    fn build_ifStmt(data: ()) -> Self {
+    fn build_ifStmt(data: (Expression, Statement, Option<Statement>)) -> Self {
         unimplemented!()
     }
-    fn build_printStmt(data: ()) -> Self {
+    fn build_printStmt(data: Expression) -> Self {
         unimplemented!()
     }
-    fn build_returnStmt(data: ()) -> Self {
+    fn build_returnStmt(data: Option<Expression>) -> Self {
         unimplemented!()
     }
-    fn build_whileStmt(data: ()) -> Self {
+    fn build_whileStmt(data: (Expression, Statement)) -> Self {
         unimplemented!()
     }
-    fn build_block(data: ()) -> Self {
+    fn build_block(data: Vec<Declaration>) -> Self {
         unimplemented!()
     }
-}*/
+}
 #[derive(Debug, PartialEq, Clone)]
 struct Function {
     name: String,
@@ -455,17 +469,39 @@ impl Function {
 impl Function {
     fn function<'a>(
         tokens: &'a [Token<'a>],
-    ) -> ::std::result::Result<(Function, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
         Ok((todo!(), tokens))
     }
 }
 
+impl Expression {
+    fn expression<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        Ok((todo!(), tokens))
+    }
+}
+/*
+impl Statement {
+    fn statement<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        Ok((todo!(), tokens))
+    }
+}*/
+
 impl Declaration {
-    //    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
-    //    grammar_rule!(declaration -> [Declaration::classDecl]);
+    grammar_rule!(id: declaration -> ([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Declaration::statement]) );
     grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    //    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
-    //    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
+    grammar_rule!(Self::build_funDecl : funDecl -> FUN [Function::function] );
+    grammar_rule!(Self::build_varDecl : varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
+
+    fn statement<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        todo!()
+    }
+
     fn build_classDecl(data: (&str, Option<&str>, Vec<Function>)) -> Self {
         let (ident, parent_name, body) = data;
         Self::ClassDecl {
@@ -474,10 +510,10 @@ impl Declaration {
             body: vec![],
         }
     }
-    fn build_funDecl(data: ()) -> Self {
+    fn build_funDecl(data: Function) -> Self {
         unimplemented!()
     }
-    fn build_varDecl(data: ()) -> Self {
+    fn build_varDecl(data: (&str, Option<Expression>)) -> Self {
         unimplemented!()
     }
 }
