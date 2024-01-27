@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+
 use phf::phf_map;
 use std::env::args;
 use std::error::Error;
@@ -541,14 +543,14 @@ fn main() -> Result<()> {
         println!("Usage: lox [script]");
         return Ok(());
     } else if args.len() == 2 {
-        runFile(&args[1])?;
+        run_file(&args[1])?;
     } else {
-        runPrompt();
+        run_prompt();
     }
     Ok(())
 }
 
-fn runFile(path: &str) -> Result<()> {
+fn run_file(path: &str) -> Result<()> {
     //get all bytes of file
     let s = std::fs::read_to_string(path)?;
     //run on the string
@@ -556,7 +558,7 @@ fn runFile(path: &str) -> Result<()> {
     Ok(())
 }
 
-fn runPrompt() -> Result<()> {
+fn run_prompt() -> Result<()> {
     let mut stdin = std::io::stdin().lock().lines();
     loop {
         print!("> ");
