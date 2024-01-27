@@ -3,6 +3,87 @@ use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
 
+/// Prepend a new item to a Heterogenous collection
+///
+/// While parsing AST we want to collect items of different types - one way to store them
+/// without making a dedicated type for each combination is with using tuples. This trait pushes
+/// an item to such collection
+trait Prepend<T> {
+    type Out;
+    /// Prepend an item to a Heterogenous collection
+    fn prep(self, item: T) -> Self::Out;
+}
+
+/// `()` is a tuple of size 0 and prepending to it gives a tuple of size 1 - a problematic size
+/// Instead we define prepending to `()` to give tuple of size 2
+impl<T> Prepend<T> for () {
+    type Out = (T, ());
+    fn prep(self, item: T) -> Self::Out {
+        (item, self)
+    }
+}
+impl Done for () {
+    type Out = ();
+    fn done(self) {}
+}
+
+/// Finalize Heterogenous collection and get back the results
+///
+/// Since we are treating collection of size 1 in a special way: `(T, ())` we want
+/// to be able to deal with that in some universal way. This trait gives us done method
+/// that strips () from a collection giving us either a tuple that is 1 smaller or just T
+/// if it's a tuple of size 1
+trait Done {
+    type Out;
+    fn done(self) -> Self::Out;
+}
+
+/// Implement Prepend for a tuple of some specific size
+///
+/// Since a tuple of every size is a separate datatype we have have to write Prepend instance
+/// for each one of them. Doing it by hand is error prone - we can implement it with macro_rules
+macro_rules! make_prepend  {
+    ($($name:ident)*) => {
+        impl<T, $($name),*> Prepend<T> for ($($name),*, ()) {
+            type Out = (T, $($name),*, ());
+            fn prep(self, item: T) -> Self::Out {
+                #[allow(non_snake_case)]
+                match self {
+                    ($($name),*, ()) => (item, $($name),*, ()),
+                }
+            }
+        }
+        impl<$($name),*> Done for ($($name),*, ()) {
+            #[allow(unused_parens)]
+            type Out = ($($name),*);
+            fn done(self) -> Self::Out {
+                #[allow(non_snake_case)]
+                match self {
+                    ($($name),*, ()) => ( $($name),*),
+                }
+            }
+        }
+    }
+}
+
+/// Implement Prepend for a number of tuple sizes
+///
+/// Calling `make_prepend!` for each tuple size can also be error prone, we can use macro_rules for
+/// that too!
+macro_rules! make_prepends {
+    ($first:ident $($name:ident)*) => {
+        // this generates prepend for current size
+        make_prepend!($first $($name)*);
+        // this generates prepends for smaller sizes
+        make_prepends!($($name)*);
+    };
+    // and that's the base case
+    () => {};
+}
+
+// By magic of recursive macro we are covering tuples of size up to 13
+make_prepends!(A B C D E F G H J K L M N);
+
 macro_rules! grammar_rule {
     ($functionname:ident -> $($tail:tt)*) => {
         fn $functionname<'a>(
