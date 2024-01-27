@@ -116,10 +116,13 @@ macro_rules! grammar_rule {
     };
 
     // This entry point generates the function that returns the result unchanged
-    //
-    // To reduce duplication we reuse previous entry point
     ($functionname:ident -> $($tail:tt)*) => {
-        grammar_rule!(id : $functionname -> $($tail:tt)*)
+        fn $functionname<'a>(
+            tokens: &'a [Token<'a>],
+        ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+            let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
+            Ok((body.done(),tokens))
+        }
     };
 
    (@munch $tokens:ident IDENTIFIER $($tail:tt)*) => {{
@@ -154,7 +157,7 @@ macro_rules! grammar_rule {
                 TokenType::NUMBER(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(value)),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::NUMBER(value))),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -178,7 +181,7 @@ macro_rules! grammar_rule {
                 TokenType::STRING(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(value)),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::STRING(value))),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -270,7 +273,7 @@ macro_rules! grammar_rule {
    }};
 
    //generic token but capture which token it was
-   (@munch $tokens:ident {$tt:ident} $($tail:tt)*) => {{
+   (@munch $tokens:ident {$tt:ident : $rep:expr} $($tail:tt)*) => {{
     match $tokens.get(0) {
         Some(first_token)=>{
             if first_token.token == TokenType::$tt {
@@ -278,7 +281,7 @@ macro_rules! grammar_rule {
                 let subtree = grammar_rule!(@munch tokens $($tail)*);
                 match subtree {
                     Ok((parsed_tail_ast,tokens)) => {
-                        Ok::<_, LoxSyntaxError>((parsed_tail_ast.prep(TokenType::$tt),tokens))
+                        Ok::<_, LoxSyntaxError>((parsed_tail_ast.prep($rep),tokens))
                     },
                     Err(e) =>Err(e)
                 }
@@ -349,6 +352,7 @@ enum Expression {
     STRING(String),
     BOOL(bool),
     NIL,
+    THIS,
     GROUPING {
         expression: Box<Expression>,
     },
@@ -474,22 +478,6 @@ impl Function {
     }
 }
 
-impl Expression {
-    fn expression<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
-        Ok((todo!(), tokens))
-    }
-}
-/*
-impl Statement {
-    fn statement<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
-        Ok((todo!(), tokens))
-    }
-}*/
-
 impl Declaration {
     grammar_rule!(id: declaration -> ([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Declaration::statement]) );
     grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
@@ -517,10 +505,11 @@ impl Declaration {
         unimplemented!()
     }
 }
-/*
+
 impl Expression {
     grammar_rule!(expression -> [Expression::assignment] );
-    grammar_rule!(Self::build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | [Expression::logic_or] ));
+    grammar_rule!(Self::build_assignment : assignment ->
+        ((([Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment]) | [Expression::logic_or] ));
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
     grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
@@ -529,14 +518,23 @@ impl Expression {
     grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
     grammar_rule!(Self::build_unary : unary -> (( {BANG} | {MINUS} ) [Expression::unary] | [Expression::call] ));
     grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN | DOT IDENTIFIER) )* );
-    grammar_rule!(Self::build_primary : primary -> ({TRUE} | {FALSE} | {NIL} | {THIS} | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
+    grammar_rule!(Self::build_primary : primary ->
+        ({TRUE:Expression::BOOL(true)} |
+         {FALSE:Expression::BOOL(false)} |
+         {NIL:Expression::NIL} |
+         {THIS:Expression::THIS} |
+         NUMBER |
+         STRING |
+         IDENTIFIER |
+         ( LEFT_PAREN [Expression::expression] RIGHT_PAREN ) |
+         (SUPER DOT IDENTIFIER) ));
     fn build_assignment(data: ()) -> Self {
         unimplemented!()
     }
-    fn build_logic_or(data: ()) -> Self {
+    fn build_logic_or(data: (Expression, Vec<Expression>)) -> Self {
         unimplemented!()
     }
-    fn build_logic_and(data: ()) -> Self {
+    fn build_logic_and(data: (Expression, Vec<Expression>)) -> Self {
         unimplemented!()
     }
     fn build_equality(data: ()) -> Self {
@@ -560,7 +558,7 @@ impl Expression {
     fn build_primary(data: ()) -> Self {
         unimplemented!()
     }
-}*/
+}
 
 #[derive(Debug, PartialEq, Clone)]
 enum UnaryOperator {
