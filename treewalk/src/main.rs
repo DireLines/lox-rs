@@ -196,10 +196,10 @@ macro_rules! grammar_rule {
     }};
 
     //OR GROUP ( a | b | c )
-    (@munch $tokens:ident ($($variants:tt)|*) $($tail:tt)*) => {{
+    (@munch $tokens:ident ($first:tt | $($variants:tt)|*) $($tail:tt)*) => {{
         let x = 5;
         let tokens = $tokens;
-        let subtree = grammar_rule!(@orgroup tokens $($variants)|*);
+        let subtree = grammar_rule!(@orgroup tokens $first | $($variants)|*);
         match subtree {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
