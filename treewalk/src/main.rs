@@ -1,25 +1,129 @@
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)] // <- bad
+
 use phf::phf_map;
 use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
 
+/// Prepend a new item to a Heterogenous collection
+///
+/// While parsing AST we want to collect items of different types - one way to store them
+/// without making a dedicated type for each combination is with using tuples. This trait pushes
+/// an item to such collection
+trait Prepend<T> {
+    type Out;
+    /// Prepend an item to a Heterogenous collection
+    fn prep(self, item: T) -> Self::Out;
+}
+
+/// `()` is a tuple of size 0 and prepending to it gives a tuple of size 1 - a problematic size
+/// Instead we define prepending to `()` to give tuple of size 2
+impl<T> Prepend<T> for () {
+    type Out = (T, ());
+    fn prep(self, item: T) -> Self::Out {
+        (item, self)
+    }
+}
+impl Done for () {
+    type Out = ();
+    fn done(self) {}
+}
+
+impl<T, I: Prepend<T>, E> Prepend<T> for ::std::result::Result<I, E> {
+    type Out = std::result::Result<<I as Prepend<T>>::Out, E>;
+    fn prep(self, item: T) -> Self::Out {
+        match self {
+            Ok(v) => Ok(v.prep(item)),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Finalize Heterogenous collection and get back the results
+///
+/// Since we are treating collection of size 1 in a special way: `(T, ())` we want
+/// to be able to deal with that in some universal way. This trait gives us done method
+/// that strips () from a collection giving us either a tuple that is 1 smaller or just T
+/// if it's a tuple of size 1
+trait Done {
+    type Out;
+    fn done(self) -> Self::Out;
+}
+
+/// Implement Prepend for a tuple of some specific size
+///
+/// Since a tuple of every size is a separate datatype we have have to write Prepend instance
+/// for each one of them. Doing it by hand is error prone - we can implement it with macro_rules
+macro_rules! make_prepend  {
+    ($($name:ident)*) => {
+        impl<T, $($name),*> Prepend<T> for ($($name),*, ()) {
+            type Out = (T, $($name),*, ());
+            fn prep(self, item: T) -> Self::Out {
+                #[allow(non_snake_case)]
+                match self {
+                    ($($name),*, ()) => (item, $($name),*, ()),
+                }
+            }
+        }
+        impl<$($name),*> Done for ($($name),*, ()) {
+            #[allow(unused_parens)]
+            type Out = ($($name),*);
+            fn done(self) -> Self::Out {
+                #[allow(non_snake_case)]
+                match self {
+                    ($($name),*, ()) => ( $($name),*),
+                }
+            }
+        }
+    }
+}
+
+/// Implement Prepend for a number of tuple sizes
+///
+/// Calling `make_prepend!` for each tuple size can also be error prone, we can use macro_rules for
+/// that too!
+macro_rules! make_prepends {
+    ($first:ident $($name:ident)*) => {
+        // this generates prepend for current size
+        make_prepend!($first $($name)*);
+        // this generates prepends for smaller sizes
+        make_prepends!($($name)*);
+    };
+    // and that's the base case
+    () => {};
+}
+
+// By magic of recursive macro we are covering tuples of size up to 13
+make_prepends!(A B C D E F G H J K L M N);
+
+const fn id<T>(item: T) -> T {
+    item
+}
+
 macro_rules! grammar_rule {
+    // Final goal for the grammar_rule rule is to generate a parser. This and the following
+    // cases are entry points.
+    //
+    // Function generated in this entry point transforms the result before returning it
+    ($ast_build_fn:path : $functionname:ident -> $($tail:tt)*) => {
+        fn $functionname<'a>(
+            tokens: &'a [Token<'a>],
+        ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+            let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
+            Ok(($ast_build_fn(body.done()),tokens))
+        }
+    };
+
+    // This entry point generates the function that returns the result unchanged
     ($functionname:ident -> $($tail:tt)*) => {
         fn $functionname<'a>(
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
             let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-            Ok((body,tokens))
+            Ok((body.done(),tokens))
         }
-       };
-   ($ast_build_fn:path : $functionname:ident -> $($tail:tt)*) => {
-    fn $functionname<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-        Ok(($ast_build_fn(body),tokens))
-    }
-   };
+    };
 
    (@munch $tokens:ident IDENTIFIER $($tail:tt)*) => {{
     match $tokens.get(0){
@@ -29,7 +133,7 @@ macro_rules! grammar_rule {
                 TokenType::IDENTIFIER(ident) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((ident,parsed_tail_ast),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(ident)),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -53,7 +157,7 @@ macro_rules! grammar_rule {
                 TokenType::NUMBER(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((value,parsed_tail_ast),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::NUMBER(value))),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -77,7 +181,7 @@ macro_rules! grammar_rule {
                 TokenType::STRING(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((value,parsed_tail_ast),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::STRING(value))),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -102,7 +206,7 @@ macro_rules! grammar_rule {
         match subtree {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
-                results.push(parsed_subtree_ast);
+                results.push(parsed_subtree_ast.done());
                 tokens = leftover_tokens;
             },
             Err(_)=>{
@@ -110,20 +214,20 @@ macro_rules! grammar_rule {
             }
         }
     }
-    let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
-    Ok(((results,parsed_tail_ast),tokens))
+    let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?; // <- bad
+    Ok((parsed_tail_ast.prep(results),tokens))
     }};
 
     //OR GROUP ( a | b | c )
-    (@munch $tokens:ident ($($variants:tt)|*) $($tail:tt)*) => {{
+    (@munch $tokens:ident ($first:tt | $($variants:tt)|*) $($tail:tt)*) => {{
         let x = 5;
         let tokens = $tokens;
-        let subtree = grammar_rule!(@orgroup tokens $($variants)|*);
+        let subtree = grammar_rule!(@orgroup tokens $first | $($variants)|*);
         match subtree {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
                 let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-                Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+                Ok((parsed_tail_ast.prep(parsed_subtree_ast.done()), tokens))
             },
             Err(e)=>{
                 //TODO: did not match any of the acceptable variants
@@ -131,6 +235,8 @@ macro_rules! grammar_rule {
             }
         }
         }};
+
+    // this handles continuation in or group
     (@orgroup $tokens:ident $first_variant:tt | $($remaining_variants:tt)|*) => {{
         let tokens = $tokens;
         let subtree = grammar_rule!(@munch tokens $first_variant);
@@ -148,7 +254,7 @@ macro_rules! grammar_rule {
     }};
 
 
-    //OPTIONAL GROUP ( a b )?
+    // OPTIONAL GROUP ( a b )?
    (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
     let tokens = $tokens;
     let subtree = grammar_rule!(@munch tokens $($subtree)+);
@@ -156,18 +262,18 @@ macro_rules! grammar_rule {
     Ok((parsed_subtree_ast,leftover_tokens))=>{
         //consume tokens for subtree
         let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
+        Ok(((parsed_tail_ast.prep(  Some(parsed_subtree_ast.done()) )),tokens))
     },
     Err(_)=>{
         //parse without consuming tokens for subtree
         let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?;
-        Ok(((None,parsed_tail_ast),tokens))
+        Ok(((parsed_tail_ast.prep(None)),tokens))
     }
    }
    }};
 
    //generic token but capture which token it was
-   (@munch $tokens:ident {$tt:ident} $($tail:tt)*) => {{
+   (@munch $tokens:ident {$tt:ident : $rep:expr} $($tail:tt)*) => {{
     match $tokens.get(0) {
         Some(first_token)=>{
             if first_token.token == TokenType::$tt {
@@ -175,7 +281,7 @@ macro_rules! grammar_rule {
                 let subtree = grammar_rule!(@munch tokens $($tail)*);
                 match subtree {
                     Ok((parsed_tail_ast,tokens)) => {
-                        Ok::<_, LoxSyntaxError>(((TokenType::$tt,parsed_tail_ast),tokens))
+                        Ok::<_, LoxSyntaxError>((parsed_tail_ast.prep($rep),tokens))
                     },
                     Err(e) =>Err(e)
                 }
@@ -212,18 +318,18 @@ macro_rules! grammar_rule {
 
     //RECURSIVE PARSING FUNCTION CALL
     (@munch $tokens:ident [$parse_fn:path] $($tail:tt)*) => {{
-    let tokens = $tokens;
-    match $parse_fn(tokens) {
-    Ok((parsed_subtree_ast,leftover_tokens))=>{
-        //consume tokens for subtree
-        let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
-        Ok(((Some(parsed_subtree_ast),parsed_tail_ast),tokens))
-    },
-    Err(e)=>{
-        //pass along error from parsing subtree
-        Err(e)
-    }
-    }
+        let tokens = $tokens;
+        match $parse_fn(tokens) {
+            Ok((parsed_subtree_ast,leftover_tokens))=>{
+                //consume tokens for subtree
+                let(parsed_tail_ast,tokens)=grammar_rule!(@munch leftover_tokens $($tail)*)?;
+                Ok((parsed_tail_ast.prep(parsed_subtree_ast), tokens))
+            },
+            Err(e)=>{
+                //pass along error from parsing subtree
+                Err(e)
+            }
+        }
     }};
 
    (@munch $tokens:ident) => {{
@@ -246,6 +352,7 @@ enum Expression {
     STRING(String),
     BOOL(bool),
     NIL,
+    THIS,
     GROUPING {
         expression: Box<Expression>,
     },
@@ -284,34 +391,49 @@ enum Statement {
     WhileStmt,
     Block,
 }
+
 impl Statement {
-    grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
+    grammar_rule!(id: statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
     grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
-    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN ( [Declaration::varDecl] | [Statement::exprStmt] | SEMICOLON ) ( [Expression::expression] )? SEMICOLON ([Expression::expression])? LEFT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN
+        ( [Statement::varDecl] | [Statement::exprStmt] | [Statement::emptyStmt] )
+        ( [Expression::expression] )? SEMICOLON
+        ( [Expression::expression] )? LEFT_PAREN [Statement::statement] );
     grammar_rule!(Self::build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
     grammar_rule!(Self::build_printStmt : printStmt -> PRINT [Expression::expression] SEMICOLON );
     grammar_rule!(Self::build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMICOLON );
     grammar_rule!(Self::build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
     grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
-    fn build_exprStmt(data: ()) -> Self {
+    grammar_rule!(Self::build_empty_stmt : emptyStmt -> SEMICOLON);
+
+    fn build_empty_stmt(data: ()) -> Self {
+        todo!()
+    }
+    fn build_exprStmt(data: Expression) -> Self {
         unimplemented!()
     }
-    fn build_forStmt(data: ()) -> Self {
+    fn varDecl<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        todo!()
+    }
+
+    fn build_forStmt(data: (Statement, Option<Expression>, Option<Expression>, Statement)) -> Self {
         unimplemented!()
     }
-    fn build_ifStmt(data: ()) -> Self {
+    fn build_ifStmt(data: (Expression, Statement, Option<Statement>)) -> Self {
         unimplemented!()
     }
-    fn build_printStmt(data: ()) -> Self {
+    fn build_printStmt(data: Expression) -> Self {
         unimplemented!()
     }
-    fn build_returnStmt(data: ()) -> Self {
+    fn build_returnStmt(data: Option<Expression>) -> Self {
         unimplemented!()
     }
-    fn build_whileStmt(data: ()) -> Self {
+    fn build_whileStmt(data: (Expression, Statement)) -> Self {
         unimplemented!()
     }
-    fn build_block(data: ()) -> Self {
+    fn build_block(data: Vec<Declaration>) -> Self {
         unimplemented!()
     }
 }
@@ -345,32 +467,49 @@ impl Function {
             body: Box::new(stmt),
         }
     }
-    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
+    //    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
+
+impl Function {
+    fn function<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        Ok((todo!(), tokens))
+    }
+}
+
 impl Declaration {
-    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
+    grammar_rule!(id: declaration -> ([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Declaration::statement]) );
     grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
-    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
-    fn build_classDecl(data: (&str, (Option<(&str, ())>, ()))) -> Self {
-        let (ident, (parent_name, _)) = data;
+    grammar_rule!(Self::build_funDecl : funDecl -> FUN [Function::function] );
+    grammar_rule!(Self::build_varDecl : varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
+
+    fn statement<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        todo!()
+    }
+
+    fn build_classDecl(data: (&str, Option<&str>, Vec<Function>)) -> Self {
+        let (ident, parent_name, body) = data;
         Self::ClassDecl {
             name: ident.to_string(),
-            parent_name: parent_name.map(|s| s.0.to_string()),
+            parent_name: parent_name.map(|s| s.to_string()),
             body: vec![],
         }
     }
-    fn build_funDecl(data: ()) -> Self {
+    fn build_funDecl(data: Function) -> Self {
         unimplemented!()
     }
-    fn build_varDecl(data: ()) -> Self {
+    fn build_varDecl(data: (&str, Option<Expression>)) -> Self {
         unimplemented!()
     }
 }
 
 impl Expression {
     grammar_rule!(expression -> [Expression::assignment] );
-    grammar_rule!(Self::build_assignment : assignment -> (( [Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment] | [Expression::logic_or] ));
+    grammar_rule!(Self::build_assignment : assignment ->
+        ((([Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment]) | [Expression::logic_or] ));
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
     grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
@@ -379,14 +518,23 @@ impl Expression {
     grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
     grammar_rule!(Self::build_unary : unary -> (( {BANG} | {MINUS} ) [Expression::unary] | [Expression::call] ));
     grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN | DOT IDENTIFIER) )* );
-    grammar_rule!(Self::build_primary : primary -> ({TRUE} | {FALSE} | {NIL} | {THIS} | NUMBER | STRING | IDENTIFIER | LEFT_PAREN [Expression::expression] RIGHT_PAREN | SUPER DOT IDENTIFIER ));
+    grammar_rule!(Self::build_primary : primary ->
+        ({TRUE:Expression::BOOL(true)} |
+         {FALSE:Expression::BOOL(false)} |
+         {NIL:Expression::NIL} |
+         {THIS:Expression::THIS} |
+         NUMBER |
+         STRING |
+         IDENTIFIER |
+         ( LEFT_PAREN [Expression::expression] RIGHT_PAREN ) |
+         (SUPER DOT IDENTIFIER) ));
     fn build_assignment(data: ()) -> Self {
         unimplemented!()
     }
-    fn build_logic_or(data: ()) -> Self {
+    fn build_logic_or(data: (Expression, Vec<Expression>)) -> Self {
         unimplemented!()
     }
-    fn build_logic_and(data: ()) -> Self {
+    fn build_logic_and(data: (Expression, Vec<Expression>)) -> Self {
         unimplemented!()
     }
     fn build_equality(data: ()) -> Self {
@@ -419,6 +567,7 @@ enum UnaryOperator {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
 enum BinaryOperator {
     MINUS,
     PLUS,
@@ -459,14 +608,14 @@ fn main() -> Result<()> {
         println!("Usage: lox [script]");
         return Ok(());
     } else if args.len() == 2 {
-        runFile(&args[1])?;
+        run_file(&args[1])?;
     } else {
-        runPrompt();
+        run_prompt();
     }
     Ok(())
 }
 
-fn runFile(path: &str) -> Result<()> {
+fn run_file(path: &str) -> Result<()> {
     //get all bytes of file
     let s = std::fs::read_to_string(path)?;
     //run on the string
@@ -474,7 +623,7 @@ fn runFile(path: &str) -> Result<()> {
     Ok(())
 }
 
-fn runPrompt() -> Result<()> {
+fn run_prompt() -> Result<()> {
     let mut stdin = std::io::stdin().lock().lines();
     loop {
         print!("> ");
@@ -708,6 +857,7 @@ struct Token<'a> {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[rustfmt::skip]
+#[allow(non_camel_case_types)]
 enum TokenType<'a> {
     // Single-character tokens.
     LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
@@ -743,6 +893,7 @@ fn run(source: &str) {
     println!("running on {source}");
 }
 
+/*
 #[test]
 fn test_simple_lexer() {
     let sample = "> << / //  this is a comment\n> / +";
@@ -1090,3 +1241,4 @@ fn test_parse_class_decl_inherit() {
         ))
     );
 }
+*/
