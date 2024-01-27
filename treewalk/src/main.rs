@@ -86,23 +86,30 @@ macro_rules! make_prepends {
 // By magic of recursive macro we are covering tuples of size up to 13
 make_prepends!(A B C D E F G H J K L M N);
 
+const fn id<T>(item: T) -> T {
+    item
+}
+
 macro_rules! grammar_rule {
-    ($functionname:ident -> $($tail:tt)*) => {
+    // Final goal for the grammar_rule rule is to generate a parser. This and the following
+    // cases are entry points.
+    //
+    // Function generated in this entry point transforms the result before returning it
+    ($ast_build_fn:path : $functionname:ident -> $($tail:tt)*) => {
         fn $functionname<'a>(
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
             let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-            Ok((body,tokens))
+            Ok(($ast_build_fn(body),tokens))
         }
-       };
-   ($ast_build_fn:path : $functionname:ident -> $($tail:tt)*) => {
-    fn $functionname<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-        let (body, tokens) = grammar_rule!(@munch tokens $($tail)*)?;
-        Ok(($ast_build_fn(body),tokens))
-    }
-   };
+    };
+
+    // This entry point generates the function that returns the result unchanged
+    //
+    // To reduce duplication we reuse previous entry point
+    ($functionname:ident -> $($tail:tt)*) => {
+        grammar_rule!(id : $functionname -> $($tail:tt)*)
+    };
 
    (@munch $tokens:ident IDENTIFIER $($tail:tt)*) => {{
     match $tokens.get(0){
@@ -431,10 +438,20 @@ impl Function {
     }
     //    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
+
+impl Function {
+    fn function<'a>(
+        tokens: &'a [Token<'a>],
+    ) -> ::std::result::Result<((), &'a [Token<'a>]), LoxSyntaxError<'a>> {
+        Ok(((), tokens))
+    }
+}
+
 impl Declaration {
     //    grammar_rule!(declaration ->([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Statement::statement]) );
-    grammar_rule!(declaration -> [Declaration::classDecl]);
-    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
+    //    grammar_rule!(declaration -> [Declaration::classDecl]);
+    //    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
+    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE  RIGHT_BRACE);
     //    grammar_rule!(Self::build_funDecl: funDecl -> FUN [Function::function] );
     //    grammar_rule!(Self::build_varDecl: varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
     fn build_classDecl(data: (&str, (Option<(&str, ())>, ()))) -> Self {
