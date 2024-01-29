@@ -395,14 +395,14 @@ enum Statement {
 impl Statement {
     grammar_rule!(id: statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
     grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
-    grammar_rule!(Self::build_forStmt : forStmt -> FOR RIGHT_PAREN
+    grammar_rule!(Self::build_forStmt : forStmt -> FOR LEFT_PAREN
         ( [Statement::varDecl] | [Statement::exprStmt] | [Statement::emptyStmt] )
         ( [Expression::expression] )? SEMICOLON
-        ( [Expression::expression] )? LEFT_PAREN [Statement::statement] );
-    grammar_rule!(Self::build_ifStmt : ifStmt -> IF RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
+        ( [Expression::expression] )? RIGHT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_ifStmt : ifStmt -> IF LEFT_PAREN [Expression::expression] RIGHT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
     grammar_rule!(Self::build_printStmt : printStmt -> PRINT [Expression::expression] SEMICOLON );
     grammar_rule!(Self::build_returnStmt : returnStmt -> RETURN ([Expression::expression])? SEMICOLON );
-    grammar_rule!(Self::build_whileStmt : whileStmt -> WHILE RIGHT_PAREN [Expression::expression] LEFT_PAREN [Statement::statement] );
+    grammar_rule!(Self::build_whileStmt : whileStmt -> WHILE LEFT_PAREN [Expression::expression] RIGHT_PAREN [Statement::statement] );
     grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
     grammar_rule!(Self::build_empty_stmt : emptyStmt -> SEMICOLON);
 
