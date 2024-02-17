@@ -348,20 +348,20 @@ enum LoxSyntaxError<'a> {
 }
 #[derive(Debug, PartialEq, Clone)]
 enum Expression {
-    NUMBER(f64),
-    STRING(String),
-    BOOL(bool),
-    NIL,
-    THIS,
-    GROUPING {
+    Number(f64),
+    String(String),
+    Bool(bool),
+    Nil,
+    This,
+    Grouping {
         expression: Box<Expression>,
     },
-    BINARY {
+    Binary {
         left: Box<Expression>,
         operator: BinaryOperator,
         right: Box<Expression>,
     },
-    UNARY {
+    Unary {
         operator: UnaryOperator,
         right: Box<Expression>,
     },
@@ -521,18 +521,16 @@ impl Expression {
     grammar_rule!(Self::build_unary : unary -> (( {BANG} | {MINUS} ) [Expression::unary] | [Expression::call] ));
     grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN | DOT IDENTIFIER) )* );
     grammar_rule!(Self::build_primary : primary ->
-        ({TRUE:Expression::BOOL(true)} |
-         {FALSE:Expression::BOOL(false)} |
-         {NIL:Expression::NIL} |
-         {THIS:Expression::THIS} |
+        ({TRUE:Expression::Bool(true)} |
+         {FALSE:Expression::Bool(false)} |
+         {NIL:Expression::Nil} |
+         {THIS:Expression::This} |
          NUMBER |
          STRING |
          IDENTIFIER |
          ( LEFT_PAREN [Expression::expression] RIGHT_PAREN ) |
          (SUPER DOT IDENTIFIER) ));
-    fn build_assignment(data: ()) -> Self {
-        unimplemented!()
-    }
+    fn build_assignment(data: ()) -> Self {}
     fn build_logic_or(data: (Expression, Vec<Expression>)) -> Self {
         unimplemented!()
     }
@@ -895,7 +893,6 @@ fn run(source: &str) {
     println!("running on {source}");
 }
 
-/*
 #[test]
 fn test_simple_lexer() {
     let sample = "> << / //  this is a comment\n> / +";
@@ -1106,8 +1103,8 @@ fn test_parse_expr() {
     let x = Expression::unary(&tokens);
     assert_eq!(
         x.unwrap().0,
-        Expression::GROUPING {
-            expression: Box::new(Expression::NUMBER(3.0))
+        Expression::Grouping {
+            expression: Box::new(Expression::Number(3.0))
         }
     );
 }
@@ -1120,10 +1117,10 @@ fn test_parse_binary() {
     let x = Expression::expression(&tokens);
     assert_eq!(
         x.unwrap().0,
-        Expression::BINARY {
-            left: Box::new(Expression::NUMBER(3.0)),
+        Expression::Binary {
+            left: Box::new(Expression::Number(3.0)),
             operator: BinaryOperator::STAR,
-            right: Box::new(Expression::NUMBER(4.0))
+            right: Box::new(Expression::Number(4.0))
         }
     );
 }
@@ -1137,14 +1134,14 @@ fn test_parse_binary_assoc() {
     use crate::Expression::*;
     assert_eq!(
         x.unwrap().0,
-        BINARY {
-            left: Box::new(BINARY {
-                left: Box::new(NUMBER(3.0)),
+        Binary {
+            left: Box::new(Binary {
+                left: Box::new(Number(3.0)),
                 operator: BinaryOperator::STAR,
-                right: Box::new(NUMBER(4.0))
+                right: Box::new(Number(4.0))
             }),
             operator: BinaryOperator::STAR,
-            right: Box::new(NUMBER(5.0))
+            right: Box::new(Number(5.0))
         }
     );
 }
@@ -1243,4 +1240,3 @@ fn test_parse_class_decl_inherit() {
         ))
     );
 }
-*/
