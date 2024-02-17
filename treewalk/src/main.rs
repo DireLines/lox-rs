@@ -378,7 +378,7 @@ enum Declaration {
         name: String,
         definition: Option<Expression>,
     },
-    Statement,
+    Statement(Statement),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -483,12 +483,7 @@ impl Declaration {
     grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
     grammar_rule!(Self::build_funDecl : funDecl -> FUN [Function::function] );
     grammar_rule!(Self::build_varDecl : varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
-
-    fn statement<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
-        todo!()
-    }
+    grammar_rule!(Self::build_statement : statement -> [Statement::statement]);
 
     fn build_classDecl(data: (&str, Option<&str>, Vec<Function>)) -> Self {
         let (ident, parent_name, body) = data;
@@ -503,6 +498,9 @@ impl Declaration {
     }
     fn build_varDecl(data: (&str, Option<Expression>)) -> Self {
         unimplemented!()
+    }
+    fn build_statement(data: Statement) -> Self {
+        Self::Statement(data)
     }
 }
 
