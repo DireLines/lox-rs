@@ -467,7 +467,7 @@ impl Function {
             body: Box::new(stmt),
         }
     }
-    //    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
+    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
 
 impl Function {
@@ -494,10 +494,14 @@ impl Declaration {
         }
     }
     fn build_funDecl(data: Function) -> Self {
-        unimplemented!()
+        Self::FunDecl(data)
     }
     fn build_varDecl(data: (&str, Option<Expression>)) -> Self {
-        unimplemented!()
+        let (ident, defn) = data;
+        Self::VarDecl {
+            name: ident.to_string(),
+            definition: defn,
+        }
     }
     fn build_statement(data: Statement) -> Self {
         Self::Statement(data)
