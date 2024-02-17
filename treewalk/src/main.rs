@@ -444,15 +444,7 @@ struct Function {
     body: Box<Option<Statement>>,
 }
 impl Function {
-    fn build_function(
-        data: (
-            &str,
-            (
-                Option<(&str, (Vec<(&str, ())>, ()))>,
-                (Option<Statement>, ()),
-            ),
-        ),
-    ) -> Self {
+    fn build_function(data: (&str, (Option<(&str, Vec<&str>)>, (Option<Statement>, ())))) -> Self {
         let (name, (params, (stmt, ()))) = data;
         let params = if let Some((first_param, (other_params, ()))) = params {
             let mut params: Vec<String> = other_params.iter().map(|e| e.0.to_owned()).collect();
@@ -532,12 +524,36 @@ impl Expression {
          (SUPER DOT IDENTIFIER) ));
     fn build_assignment(data: ()) -> Self {}
     fn build_logic_or(data: (Expression, Vec<Expression>)) -> Self {
-        unimplemented!()
+        let (first, rest) = data;
+        if rest.len() == 1 {
+            Self::Binary {
+                left: first,
+                operator: BinaryOperator::Or,
+                right: rest[0],
+            }
+        }
+        Self::Binary {
+            left: first,
+            operator: BinaryOperator::Or,
+            right: Self::build_logic_or((rest[0], rest.iter().skip(1).collect())),
+        }
     }
     fn build_logic_and(data: (Expression, Vec<Expression>)) -> Self {
-        unimplemented!()
+        let (first, rest) = data;
+        if rest.len() == 1 {
+            Self::Binary {
+                left: first,
+                operator: BinaryOperator::And,
+                right: rest[0],
+            }
+        }
+        Self::Binary {
+            left: first,
+            operator: BinaryOperator::And,
+            right: Self::build_logic_and((rest[0], rest.iter().skip(1).collect())),
+        }
     }
-    fn build_equality(data: ()) -> Self {
+    fn build_equality(data: (Expression, Vec<(TokenType, Expression)>)) -> Self {
         unimplemented!()
     }
     fn build_comparison(data: ()) -> Self {
@@ -569,17 +585,19 @@ enum UnaryOperator {
 #[derive(Debug, PartialEq, Clone)]
 #[allow(non_camel_case_types)]
 enum BinaryOperator {
-    MINUS,
-    PLUS,
-    SLASH,
-    STAR,
-    EQUAL,
-    EQUAL_EQUAL,
-    BANG_EQUAL,
-    GREATER,
-    GREATER_EQUAL,
-    LESS,
-    LESS_EQUAL,
+    Minus,
+    Plus,
+    Slash,
+    Star,
+    Equal,
+    EqualEqual,
+    BangEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    Or,
+    And,
 }
 
 const KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
@@ -1119,7 +1137,7 @@ fn test_parse_binary() {
         x.unwrap().0,
         Expression::Binary {
             left: Box::new(Expression::Number(3.0)),
-            operator: BinaryOperator::STAR,
+            operator: BinaryOperator::Star,
             right: Box::new(Expression::Number(4.0))
         }
     );
@@ -1137,10 +1155,10 @@ fn test_parse_binary_assoc() {
         Binary {
             left: Box::new(Binary {
                 left: Box::new(Number(3.0)),
-                operator: BinaryOperator::STAR,
+                operator: BinaryOperator::Star,
                 right: Box::new(Number(4.0))
             }),
-            operator: BinaryOperator::STAR,
+            operator: BinaryOperator::Star,
             right: Box::new(Number(5.0))
         }
     );
