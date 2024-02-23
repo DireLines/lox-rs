@@ -218,6 +218,7 @@ macro_rules! grammar_rule {
     Ok((parsed_tail_ast.prep(results),tokens))
     }};
 
+
     //OR GROUP ( a | b | c )
     (@munch $tokens:ident ($first:tt | $($variants:tt)|*) $($tail:tt)*) => {{
         let x = 5;
@@ -272,8 +273,51 @@ macro_rules! grammar_rule {
    }
    }};
 
+       //PARENTHESIZED GROUP ( a b )
+       (@munch $tokens:ident ($($subtree:tt)+) $($tail:tt)*) => {{
+        let mut tokens = $tokens;
+        let subtree = grammar_rule!(@munch tokens $($subtree)+);
+        match subtree {
+            Ok((parsed_subtree_ast,leftover_tokens))=>{
+                //consume tokens for subtree
+                let results = parsed_subtree_ast.done();
+                tokens = leftover_tokens;
+                let(parsed_tail_ast,tokens)=grammar_rule!(@munch tokens $($tail)*)?; // <- bad
+                Ok((parsed_tail_ast.prep(results),tokens))
+            },
+            Err(e)=>{
+                Err(e)
+            }
+        }
+        }};
+
+      //generic token but capture which token it was
+      (@munch $tokens:ident {$tt:ident : $rep:expr} $($tail:tt)*) => {{
+        match $tokens.get(0) {
+            Some(first_token)=>{
+                if first_token.token == TokenType::$tt {
+                    let tokens = &$tokens[1..];
+                    let subtree = grammar_rule!(@munch tokens $($tail)*);
+                    match subtree {
+                        Ok((parsed_tail_ast,tokens)) => {
+                            Ok::<_, LoxSyntaxError>((parsed_tail_ast.prep($rep),tokens))
+                        },
+                        Err(e) =>Err(e)
+                    }
+                } else {
+                    Err(LoxSyntaxError::UnexpectedToken{
+                            lexeme: first_token.lexeme,
+                            line: first_token.line,
+                            message: "Unexpected token",
+                    })
+                }
+            },
+            None => Err(LoxSyntaxError::UnexpectedEof)
+        }
+       }};
+
    //generic token but capture which token it was
-   (@munch $tokens:ident {$tt:ident : $rep:expr} $($tail:tt)*) => {{
+   (@munch $tokens:ident {$tt:ident} $($tail:tt)*) => {{
     match $tokens.get(0) {
         Some(first_token)=>{
             if first_token.token == TokenType::$tt {
@@ -281,7 +325,7 @@ macro_rules! grammar_rule {
                 let subtree = grammar_rule!(@munch tokens $($tail)*);
                 match subtree {
                     Ok((parsed_tail_ast,tokens)) => {
-                        Ok::<_, LoxSyntaxError>((parsed_tail_ast.prep($rep),tokens))
+                        Ok::<_, LoxSyntaxError>((parsed_tail_ast.prep(TokenType::$tt),tokens))
                     },
                     Err(e) =>Err(e)
                 }
@@ -393,7 +437,7 @@ enum Statement {
 }
 
 impl Statement {
-    grammar_rule!(id: statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
+    grammar_rule!(statement -> ([Statement::exprStmt] | [Statement::forStmt] | [Statement::ifStmt] | [Statement::printStmt] | [Statement::returnStmt] | [Statement::whileStmt] | [Statement::block]) );
     grammar_rule!(Self::build_exprStmt : exprStmt -> [Expression::expression] SEMICOLON );
     grammar_rule!(Self::build_forStmt : forStmt -> FOR LEFT_PAREN
         ( [Statement::varDecl] | [Statement::exprStmt] | [Statement::emptyStmt] )
@@ -459,25 +503,25 @@ impl Function {
             body: Box::new(stmt),
         }
     }
-    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
 
 impl Function {
-    fn function<'a>(
-        tokens: &'a [Token<'a>],
-    ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
-        Ok((todo!(), tokens))
-    }
+    // fn function<'a>(
+    //     tokens: &'a [Token<'a>],
+    // ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
+    //     Ok((todo!(), tokens))
+    // }
+    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
 }
 
 impl Declaration {
-    grammar_rule!(id: declaration -> ([Declaration::classDecl] | [Declaration::funDecl] | [Declaration::varDecl] | [Declaration::statement]) );
-    grammar_rule!(Self::build_classDecl : classDecl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    grammar_rule!(Self::build_funDecl : funDecl -> FUN [Function::function] );
-    grammar_rule!(Self::build_varDecl : varDecl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
+    grammar_rule!(declaration -> ([Declaration::class_decl] | [Declaration::fun_decl] | [Declaration::var_decl] | [Declaration::statement]) );
+    grammar_rule!(Self::build_class_decl : class_decl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
+    grammar_rule!(Self::build_fun_decl : fun_decl -> FUN [Function::function] );
+    grammar_rule!(Self::build_var_decl : var_decl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
     grammar_rule!(Self::build_statement : statement -> [Statement::statement]);
 
-    fn build_classDecl(data: (&str, Option<&str>, Vec<Function>)) -> Self {
+    fn build_class_decl(data: (&str, Option<&str>, Vec<Function>)) -> Self {
         let (ident, parent_name, body) = data;
         Self::ClassDecl {
             name: ident.to_string(),
@@ -485,10 +529,10 @@ impl Declaration {
             body: vec![],
         }
     }
-    fn build_funDecl(data: Function) -> Self {
+    fn build_fun_decl(data: Function) -> Self {
         Self::FunDecl(data)
     }
-    fn build_varDecl(data: (&str, Option<Expression>)) -> Self {
+    fn build_var_decl(data: (&str, Option<Expression>)) -> Self {
         let (ident, defn) = data;
         Self::VarDecl {
             name: ident.to_string(),
@@ -502,16 +546,20 @@ impl Declaration {
 
 impl Expression {
     grammar_rule!(expression -> [Expression::assignment] );
-    grammar_rule!(Self::build_assignment : assignment ->
-        ((([Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment]) | [Expression::logic_or] ));
+    grammar_rule!(Self::build_assignment : assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
+    grammar_rule!(Self::build_member_assign : member_assign -> ([Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment]);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
     grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
     grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
     grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
     grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
-    grammar_rule!(Self::build_unary : unary -> (( {BANG} | {MINUS} ) [Expression::unary] | [Expression::call] ));
-    grammar_rule!(Self::build_call : call -> [Expression::primary] ( (LEFT_PAREN([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN | DOT IDENTIFIER) )* );
+    grammar_rule!(Self::build_unary : unary -> ( [Expression::nonrecursive_unary] | [Expression::call] ));
+    grammar_rule!(Self::build_nonrecursive_unary : nonrecursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
+    grammar_rule!(Self::build_call : 
+        call -> [Expression::primary] ( ([Expression::call_args] | [Expression::field_access]) )* );
+    grammar_rule!(Self::build_call_args : call_args -> LEFT_PAREN ([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN);
+    grammar_rule!(Self::build_field_access : field_access -> DOT IDENTIFIER);
     grammar_rule!(Self::build_primary : primary ->
         ({TRUE:Expression::Bool(true)} |
          {FALSE:Expression::Bool(false)} |
@@ -520,9 +568,11 @@ impl Expression {
          NUMBER |
          STRING |
          IDENTIFIER |
-         ( LEFT_PAREN [Expression::expression] RIGHT_PAREN ) |
-         (SUPER DOT IDENTIFIER) ));
-    fn build_assignment(data: ()) -> Self {}
+         (LEFT_PAREN [Expression::expression] RIGHT_PAREN) |
+         [Expression::super_field_access] ));
+   
+    grammar_rule!(Self::build_super_field_access : super_field_access -> SUPER DOT IDENTIFIER);
+     fn build_assignment(data: ()) -> Self {}
     fn build_logic_or(data: (Expression, Vec<Expression>)) -> Self {
         let (first, rest) = data;
         if rest.len() == 1 {
@@ -554,7 +604,28 @@ impl Expression {
         }
     }
     fn build_equality(data: (Expression, Vec<(TokenType, Expression)>)) -> Self {
-        unimplemented!()
+        let (first, rest) = data;
+        let token_type_to_op = |tt: TokenType| {
+            if tt == TokenType::EQUAL_EQUAL {
+                BinaryOperator::EqualEqual
+            } else if tt == TokenType::BANG_EQUAL {
+                BinaryOperator::BangEqual
+            } else {
+                unreachable!();
+            }
+        };
+        if rest.len() == 1 {
+            Self::Binary {
+                left: first,
+                operator: token_type_to_op(rest[0].0),
+                right: rest[0].1,
+            }
+        }
+        Self::Binary {
+            left: first,
+            operator: token_type_to_op(rest[0].0),
+            right: Self::build_equality((rest[0].1, rest.iter().skip(1).collect())),
+        }
     }
     fn build_comparison(data: ()) -> Self {
         unimplemented!()
@@ -572,6 +643,21 @@ impl Expression {
         unimplemented!()
     }
     fn build_primary(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_member_assign(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_nonrecursive_unary(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_call_args(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_field_access(data: ()) -> Self {
+        unimplemented!()
+    }
+    fn build_super_field_access(data: ()) -> Self {
         unimplemented!()
     }
 }
@@ -1226,7 +1312,7 @@ fn test_parse_class_decl_no_inherit() {
     let sample = "class Foo";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Declaration::classDecl(&tokens);
+    let x = Declaration::class_decl(&tokens);
     assert_eq!(
         x,
         Ok((
@@ -1245,7 +1331,7 @@ fn test_parse_class_decl_inherit() {
     let sample = "class Foo < Bar";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Declaration::classDecl(&tokens);
+    let x = Declaration::class_decl(&tokens);
     assert_eq!(
         x,
         Ok((
