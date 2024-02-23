@@ -394,6 +394,7 @@ enum LoxSyntaxError<'a> {
 enum Expression {
     Number(f64),
     String(String),
+    Identifier(String),
     Bool(bool),
     Nil,
     This,
@@ -409,7 +410,17 @@ enum Expression {
         operator: UnaryOperator,
         right: Box<Expression>,
     },
+    MemberAssign{
+        target:Option<Box<Expression>>,
+        field:String,
+        value: Box<Expression>,
+    },
+    Call {
+        
+        args: Box<Expression>,
+    }
 }
+
 #[derive(Debug, PartialEq, Clone)]
 enum Declaration {
     ClassDecl {
@@ -417,7 +428,7 @@ enum Declaration {
         parent_name: Option<String>,
         body: Vec<()>,
     },
-    FunDecl(()),
+    FunDecl(Function),
     VarDecl {
         name: String,
         definition: Option<Expression>,
@@ -488,10 +499,9 @@ struct Function {
     body: Box<Option<Statement>>,
 }
 impl Function {
-    fn build_function(data: (&str, (Option<(&str, Vec<&str>)>, (Option<Statement>, ())))) -> Self {
-        let (name, (params, (stmt, ()))) = data;
-        let params = if let Some((first_param, (other_params, ()))) = params {
-            let mut params: Vec<String> = other_params.iter().map(|e| e.0.to_owned()).collect();
+    fn build_function((name,params,stmt): (&str, Option<(&str, Vec<&str>)>, Option<Statement>)) -> Self {
+        let params = if let Some((first_param, other_params)) = params {
+            let mut params: Vec<String> = other_params.iter().map(|e| e.to_string()).collect();
             params.insert(0, first_param.to_owned());
             params
         } else {
@@ -511,7 +521,7 @@ impl Function {
     // ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
     //     Ok((todo!(), tokens))
     // }
-    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN [Statement::block]);
+    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN ([Statement::block])?);
 }
 
 impl Declaration {
@@ -543,10 +553,29 @@ impl Declaration {
         Self::Statement(data)
     }
 }
+enum MemberAccess {
+    Field(String),
+    Args{args:Vec<Expression>}
+}
+
+impl MemberAccess {
+    grammar_rule!(Self::build_function_name : function_name ->  LEFT_PAREN ([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN);
+    grammar_rule!(Self::build_field_name : field_name -> DOT IDENTIFIER);
+    fn build_function_name(data: Option<(Expression, Vec<Expression>)>) -> Self {
+        let args =  data.map_or(Vec::new(), |(first,mut rest)| {
+            rest.insert(0,first);
+            rest 
+        });
+        MemberAccess::Args { args }
+    }
+    fn build_field_name(name: &str) -> Self {
+        MemberAccess::Field(name.to_string())
+    }
+}
 
 impl Expression {
     grammar_rule!(expression -> [Expression::assignment] );
-    grammar_rule!(Self::build_assignment : assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
+    grammar_rule!(assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
     grammar_rule!(Self::build_member_assign : member_assign -> ([Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment]);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
@@ -554,12 +583,10 @@ impl Expression {
     grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
     grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
     grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
-    grammar_rule!(Self::build_unary : unary -> ( [Expression::nonrecursive_unary] | [Expression::call] ));
+    grammar_rule!(unary -> ( [Expression::nonrecursive_unary] | [Expression::call] ));
     grammar_rule!(Self::build_nonrecursive_unary : nonrecursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
     grammar_rule!(Self::build_call : 
-        call -> [Expression::primary] ( ([Expression::call_args] | [Expression::field_access]) )* );
-    grammar_rule!(Self::build_call_args : call_args -> LEFT_PAREN ([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN);
-    grammar_rule!(Self::build_field_access : field_access -> DOT IDENTIFIER);
+        call -> [Expression::primary] ( ([MemberAccess::field_name] | [MemberAccess::function_name]) )* );
     grammar_rule!(Self::build_primary : primary ->
         ({TRUE:Expression::Bool(true)} |
          {FALSE:Expression::Bool(false)} |
@@ -567,44 +594,26 @@ impl Expression {
          {THIS:Expression::This} |
          NUMBER |
          STRING |
-         IDENTIFIER |
+         [Expression::identifier] |
          (LEFT_PAREN [Expression::expression] RIGHT_PAREN) |
          [Expression::super_field_access] ));
-   
+    grammar_rule!(Self::build_ident : identifier -> IDENTIFIER);
     grammar_rule!(Self::build_super_field_access : super_field_access -> SUPER DOT IDENTIFIER);
-     fn build_assignment(data: ()) -> Self {}
-    fn build_logic_or(data: (Expression, Vec<Expression>)) -> Self {
-        let (first, rest) = data;
-        if rest.len() == 1 {
-            Self::Binary {
-                left: first,
-                operator: BinaryOperator::Or,
-                right: rest[0],
-            }
+    fn build_logic_or((first, rest): (Expression, Vec<Expression>)) -> Self {
+        let mut result = first;
+        for expr in rest {
+            result = Self::Binary { left: Box::new(result), operator:  BinaryOperator::Or, right: Box::new(expr) }
         }
-        Self::Binary {
-            left: first,
-            operator: BinaryOperator::Or,
-            right: Self::build_logic_or((rest[0], rest.iter().skip(1).collect())),
-        }
+        result
     }
-    fn build_logic_and(data: (Expression, Vec<Expression>)) -> Self {
-        let (first, rest) = data;
-        if rest.len() == 1 {
-            Self::Binary {
-                left: first,
-                operator: BinaryOperator::And,
-                right: rest[0],
-            }
+    fn build_logic_and((first, rest): (Expression, Vec<Expression>)) -> Self {
+        let mut result = first;
+        for expr in rest {
+            result = Self::Binary { left: Box::new(result), operator:  BinaryOperator::And, right: Box::new(expr) }
         }
-        Self::Binary {
-            left: first,
-            operator: BinaryOperator::And,
-            right: Self::build_logic_and((rest[0], rest.iter().skip(1).collect())),
-        }
+        result
     }
-    fn build_equality(data: (Expression, Vec<(TokenType, Expression)>)) -> Self {
-        let (first, rest) = data;
+    fn build_equality((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
         let token_type_to_op = |tt: TokenType| {
             if tt == TokenType::EQUAL_EQUAL {
                 BinaryOperator::EqualEqual
@@ -614,58 +623,98 @@ impl Expression {
                 unreachable!();
             }
         };
-        if rest.len() == 1 {
-            Self::Binary {
-                left: first,
-                operator: token_type_to_op(rest[0].0),
-                right: rest[0].1,
+        let mut result = first;
+        for (tt,expr) in rest {
+            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
+        }
+        result
+    }
+    fn build_comparison((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
+        let token_type_to_op = |tt: TokenType| {
+            if tt == TokenType::GREATER {
+                BinaryOperator::Greater
+            } else if tt == TokenType::GREATER_EQUAL {
+                BinaryOperator::GreaterEqual
+            } else if tt == TokenType::LESS {
+                BinaryOperator::Less
+            }else if tt == TokenType::LESS_EQUAL {
+                BinaryOperator::LessEqual
+            }else {
+                unreachable!();
             }
+        };
+        let mut result = first;
+        for (tt,expr) in rest {
+            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
         }
-        Self::Binary {
-            left: first,
-            operator: token_type_to_op(rest[0].0),
-            right: Self::build_equality((rest[0].1, rest.iter().skip(1).collect())),
+        result
+    }
+    fn build_member_assign((call,ident,value): (Option<Expression>, &str, Expression)) -> Self {
+        let target = call.map(Box::new);
+        Self::MemberAssign { target: target, field: ident.to_string(), value: Box::new(value) }
+    }
+    fn build_term((first,rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
+        let token_type_to_op = |tt: TokenType| {
+            if tt == TokenType::PLUS {
+                BinaryOperator::Plus
+            } else if tt == TokenType::MINUS {
+                BinaryOperator::Minus
+            } else {
+                unreachable!();
+            }
+        };
+        let mut result = first;
+        for (tt,expr) in rest {
+            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
         }
+        result
     }
-    fn build_comparison(data: ()) -> Self {
-        unimplemented!()
+    fn build_factor((first,rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
+        let token_type_to_op = |tt: TokenType| {
+            if tt == TokenType::SLASH {
+                BinaryOperator::Div
+            } else if tt == TokenType::STAR {
+                BinaryOperator::Mul
+            } else {
+                unreachable!();
+            }
+        };
+        let mut result = first;
+        for (tt,expr) in rest {
+            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
+        }
+        result
     }
-    fn build_term(data: ()) -> Self {
-        unimplemented!()
-    }
-    fn build_factor(data: ()) -> Self {
-        unimplemented!()
-    }
-    fn build_unary(data: ()) -> Self {
-        unimplemented!()
-    }
-    fn build_call(data: ()) -> Self {
+    fn build_call(data: (Expression, Vec<Expression>)) -> Self {
         unimplemented!()
     }
     fn build_primary(data: ()) -> Self {
         unimplemented!()
     }
-    fn build_member_assign(data: ()) -> Self {
-        unimplemented!()
-    }
-    fn build_nonrecursive_unary(data: ()) -> Self {
-        unimplemented!()
-    }
-    fn build_call_args(data: ()) -> Self {
-        unimplemented!()
-    }
-    fn build_field_access(data: ()) -> Self {
-        unimplemented!()
+    fn build_nonrecursive_unary((tt,expr): (TokenType, Expression)) -> Self {
+        let token_type_to_op = |tt: TokenType| {
+            if tt == TokenType::MINUS {
+               UnaryOperator::Neg
+            } else if tt == TokenType::BANG {
+                UnaryOperator::Not
+            } else {
+                unreachable!();
+            }
+        };
+        Self::Unary { operator: token_type_to_op(tt), right: Box::new(expr) }
     }
     fn build_super_field_access(data: ()) -> Self {
         unimplemented!()
+    }
+    fn build_ident(data: &str) -> Self {
+        Self::Identifier(data.to_string())
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 enum UnaryOperator {
-    MINUS,
-    BANG,
+    Neg,
+    Not,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -673,8 +722,8 @@ enum UnaryOperator {
 enum BinaryOperator {
     Minus,
     Plus,
-    Slash,
-    Star,
+    Div,
+    Mul,
     Equal,
     EqualEqual,
     BangEqual,
