@@ -157,7 +157,7 @@ macro_rules! grammar_rule {
                 TokenType::NUMBER(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::NUMBER(value))),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::Number(value))),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -181,7 +181,7 @@ macro_rules! grammar_rule {
                 TokenType::STRING(value) => {
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
-                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::STRING(value))),tokens))
+                            Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::String(value.to_string()))),tokens))
                         },
                         Err(e) =>Err(e)
                     }
@@ -416,8 +416,11 @@ enum Expression {
         value: Box<Expression>,
     },
     Call {
-        
-        args: Box<Expression>,
+        base: Box<Expression>,
+        path: Vec<MemberAccess>,
+    },
+    SuperFieldAccess {
+        field:String,
     }
 }
 
@@ -553,6 +556,7 @@ impl Declaration {
         Self::Statement(data)
     }
 }
+#[derive(Debug, PartialEq, Clone)]
 enum MemberAccess {
     Field(String),
     Args{args:Vec<Expression>}
@@ -587,7 +591,7 @@ impl Expression {
     grammar_rule!(Self::build_nonrecursive_unary : nonrecursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
     grammar_rule!(Self::build_call : 
         call -> [Expression::primary] ( ([MemberAccess::field_name] | [MemberAccess::function_name]) )* );
-    grammar_rule!(Self::build_primary : primary ->
+    grammar_rule!(primary ->
         ({TRUE:Expression::Bool(true)} |
          {FALSE:Expression::Bool(false)} |
          {NIL:Expression::Nil} |
@@ -685,11 +689,8 @@ impl Expression {
         }
         result
     }
-    fn build_call(data: (Expression, Vec<Expression>)) -> Self {
-        unimplemented!()
-    }
-    fn build_primary(data: ()) -> Self {
-        unimplemented!()
+    fn build_call((base,path): (Expression, Vec<MemberAccess>)) -> Self {
+        Self::Call { base: Box::new(base), path }
     }
     fn build_nonrecursive_unary((tt,expr): (TokenType, Expression)) -> Self {
         let token_type_to_op = |tt: TokenType| {
@@ -703,11 +704,13 @@ impl Expression {
         };
         Self::Unary { operator: token_type_to_op(tt), right: Box::new(expr) }
     }
-    fn build_super_field_access(data: ()) -> Self {
-        unimplemented!()
-    }
     fn build_ident(data: &str) -> Self {
         Self::Identifier(data.to_string())
+    }
+    fn build_super_field_access(ident: &str) -> Self {
+        Self::SuperFieldAccess {
+            field:ident.to_string()
+        }
     }
 }
 
