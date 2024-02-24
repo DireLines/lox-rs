@@ -1373,7 +1373,7 @@ fn test_syntax_error_incomplete_binary() {
 
 #[test]
 fn test_parse_class_decl_no_inherit() {
-    let sample = "class Foo";
+    let sample = "class Foo {}";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::class_decl(&tokens);
@@ -1392,7 +1392,7 @@ fn test_parse_class_decl_no_inherit() {
 
 #[test]
 fn test_parse_class_decl_inherit() {
-    let sample = "class Foo < Bar";
+    let sample = "class Foo < Bar {}";
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::class_decl(&tokens);
