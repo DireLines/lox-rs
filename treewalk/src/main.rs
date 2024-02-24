@@ -522,6 +522,7 @@ struct Function {
     body: Box<Option<Statement>>,
 }
 impl Function {
+    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN ([Statement::block])?);
     fn build_function((name,params,stmt): (&str, Option<(&str, Vec<&str>)>, Option<Statement>)) -> Self {
         let params = if let Some((first_param, other_params)) = params {
             let mut params: Vec<String> = other_params.iter().map(|e| e.to_string()).collect();
@@ -536,15 +537,6 @@ impl Function {
             body: Box::new(stmt),
         }
     }
-}
-
-impl Function {
-    // fn function<'a>(
-    //     tokens: &'a [Token<'a>],
-    // ) -> ::std::result::Result<(Self, &'a [Token<'a>]), LoxSyntaxError<'a>> {
-    //     Ok((todo!(), tokens))
-    // }
-    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN ([Statement::block])?);
 }
 
 impl Declaration {
