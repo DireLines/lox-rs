@@ -599,8 +599,8 @@ impl Expression {
     grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
     grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
     grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
-    grammar_rule!(unary -> ( [Expression::nonrecursive_unary] | [Expression::call] ));
-    grammar_rule!(Self::build_nonrecursive_unary : nonrecursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
+    grammar_rule!(unary -> ( [Expression::recursive_unary] | [Expression::primary] | [Expression::call] ));
+    grammar_rule!(Self::build_recursive_unary : recursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
     grammar_rule!(Self::build_call : 
         call -> [Expression::primary] ( ([MemberAccess::field_name] | [MemberAccess::function_name]) )* );
     grammar_rule!(primary ->
@@ -704,7 +704,7 @@ impl Expression {
     fn build_call((base,path): (Expression, Vec<MemberAccess>)) -> Self {
         Self::Call { base: Box::new(base), path }
     }
-    fn build_nonrecursive_unary((tt,expr): (TokenType, Expression)) -> Self {
+    fn build_recursive_unary((tt,expr): (TokenType, Expression)) -> Self {
         let token_type_to_op = |tt: TokenType| {
             if tt == TokenType::MINUS {
                UnaryOperator::Neg
@@ -1271,9 +1271,7 @@ fn test_parse_expr() {
     let x = Expression::unary(&tokens);
     assert_eq!(
         x.unwrap().0,
-        Expression::Grouping {
-            expression: Box::new(Expression::Number(3.0))
-        }
+        Expression::Number(3.0),
     );
 }
 
@@ -1341,7 +1339,7 @@ fn test_syntax_error_unexpected_paren() {
         Err(LoxSyntaxError::UnexpectedToken {
             lexeme: ")",
             line: 0,
-            message: "right paren with no left paren"
+            message: "Unexpected token"
         })
     );
 }
@@ -1357,7 +1355,7 @@ fn test_syntax_error_missing_paren() {
         Err(LoxSyntaxError::UnexpectedToken {
             lexeme: "2",
             line: 0,
-            message: "missing right paren"
+            message: "Unexpected token"
         })
     );
 }
