@@ -382,6 +382,20 @@ macro_rules! grammar_rule {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+struct Program {
+    body:Vec<Declaration>,
+}
+
+impl Program {
+    grammar_rule!(Self::build_program : program -> ([Declaration::declaration])*);
+    fn build_program(body: Vec<Declaration>)->Self{
+        Self {
+            body
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 enum LoxSyntaxError<'a> {
     UnexpectedEof,
     UnexpectedToken {
@@ -578,7 +592,7 @@ impl MemberAccess {
     grammar_rule!(Self::build_function_name : function_name ->  LEFT_PAREN ([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN);
     grammar_rule!(Self::build_field_name : field_name -> DOT IDENTIFIER);
     fn build_function_name(data: Option<(Expression, Vec<Expression>)>) -> Self {
-        let args =  data.map_or(Vec::new(), |(first,mut rest)| {
+        let args = data.map_or(Vec::new(), |(first,mut rest)| {
             rest.insert(0,first);
             rest 
         });
@@ -1405,4 +1419,58 @@ fn test_parse_class_decl_inherit() {
             &[][..]
         ))
     );
+}
+
+
+//things that don't work
+/*
+while (a < 10) {
+  print a;
+  a = a + 1;
+}
+ */
+/*
+for (var a = 1; a < 10; a = a + 1) {
+  print a;
+}
+ */
+/*
+fun addPair(a, b) {
+  return a + b;
+}
+
+fun identity(a) {
+  return a;
+}
+
+print identity(addPair)(1, 2); // Prints "3".
+ */
+/*
+var fn = returnFunction();
+ */
+/*
+fn();
+ */
+/*
+class Breakfast {
+    init(meat, bread) {
+        this.meat = meat;
+        this.bread = bread;
+    }
+    
+    // ...
+    }
+ */
+ /*
+ var benedict = Brunch(\"ham\", \"English muffin\");
+  */
+#[test]
+fn test_parse_if_statement() {
+    let sample = "
+    var benedict = Brunch(\"ham\", \"English muffin\");
+    ";
+    let scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Program::program(&tokens);
+    println!("{:#?}",x);
 }
