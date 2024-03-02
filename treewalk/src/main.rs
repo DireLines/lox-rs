@@ -111,15 +111,15 @@ macro_rules! grammar_rule {
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
             let desc = format!("{}::{}",std::any::type_name::<Self>(),stringify!($functionname));
-            println!("{desc}");
+            // println!("{desc}");
             let res = grammar_rule!(@munch tokens $($tail)*);
             match res {
                 Ok((body,tokens))=>{
-                    println!("{desc} ok");
+                    // println!("{desc} ok");
                     Ok(($ast_build_fn(body.done()),tokens))
                 },
                 Err(e)=>{
-                    println!("{desc} not ok");
+                    // println!("{desc} not ok");
                     Err(e)
                 }
             }
@@ -137,7 +137,7 @@ macro_rules! grammar_rule {
             let tokens = &$tokens[1..];
             match first_token.token {
                 TokenType::IDENTIFIER(ident) => {
-                    println!("IDENTIFIER \"{}\" found",ident);
+                    // println!("IDENTIFIER \"{}\" found",ident);
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
                             Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(ident)),tokens))
@@ -146,7 +146,7 @@ macro_rules! grammar_rule {
                     }
                 }
                 _ => { 
-                    println!("IDENTIFIER not found");
+                    // println!("IDENTIFIER not found");
                     Err(LoxSyntaxError::UnexpectedToken{
                     lexeme: first_token.lexeme,
                     line: first_token.line,
@@ -165,7 +165,7 @@ macro_rules! grammar_rule {
             let tokens = &$tokens[1..];
             match first_token.token {
                 TokenType::NUMBER(value) => {
-                    println!("NUMBER {} found",value);
+                    // println!("NUMBER {} found",value);
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
                             Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::Number(value))),tokens))
@@ -174,7 +174,7 @@ macro_rules! grammar_rule {
                     }
                 }
                 _ => { 
-                    println!("NUMBER not found");
+                    // println!("NUMBER not found");
                     Err(LoxSyntaxError::UnexpectedToken{
                         lexeme: first_token.lexeme,
                         line: first_token.line,
@@ -193,7 +193,7 @@ macro_rules! grammar_rule {
             let tokens = &$tokens[1..];
             match first_token.token {
                 TokenType::STRING(value) => {
-                    println!("STRING \"{}\" found",value);
+                    // println!("STRING \"{}\" found",value);
                     match grammar_rule!(@munch tokens $($tail)*) {
                         Ok((parsed_tail_ast,tokens)) => {
                             Ok::<_, LoxSyntaxError>(((parsed_tail_ast.prep(Expression::String(value.to_string()))),tokens))
@@ -202,7 +202,7 @@ macro_rules! grammar_rule {
                     }
                 }
                 _ =>  {
-                    println!("STRING not found");
+                    // println!("STRING not found");
                     Err(LoxSyntaxError::UnexpectedToken{
                         lexeme: first_token.lexeme,
                         line: first_token.line,
@@ -217,7 +217,7 @@ macro_rules! grammar_rule {
 
     //REPEATED GROUP ( a b )*
     (@munch $tokens:ident ($($subtree:tt)+)* $($tail:tt)*) => {{
-        println!("repeated group");
+        // println!("repeated group");
     let mut tokens = $tokens;
     let mut results = vec![];
     loop {
@@ -247,7 +247,7 @@ macro_rules! grammar_rule {
         let subtree = grammar_rule!(@orgroup tokens $first | $($variants)|*);
         match subtree {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
-                println!("or group: {} ok",stringify!($first));
+                // println!("or group: {} ok",stringify!($first));
                 //consume tokens for subtree
                 let res = grammar_rule!(@munch leftover_tokens $($tail)*);
                 match res {
@@ -256,7 +256,7 @@ macro_rules! grammar_rule {
                 }
             },
             Err(e)=>{
-                println!("or group: {} not ok",stringify!($first));
+                // println!("or group: {} not ok",stringify!($first));
                 //TODO: did not match any of the acceptable variants
                 Err(e)
             }
@@ -269,11 +269,11 @@ macro_rules! grammar_rule {
         let subtree = grammar_rule!(@munch tokens $first_variant);
         match subtree {
             Ok(_)=>{
-                println!("or group: {} ok",stringify!($first_variant));
+                // println!("or group: {} ok",stringify!($first_variant));
                 subtree
             },
             Err(_)=>{
-                println!("or group: {} not ok",stringify!($first_variant));
+                // println!("or group: {} not ok",stringify!($first_variant));
                 grammar_rule!(@orgroup tokens $($remaining_variants)|*)
             }
         }
@@ -285,12 +285,12 @@ macro_rules! grammar_rule {
 
     // OPTIONAL GROUP ( a b )?
    (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
-    println!("optional group");
+    // println!("optional group");
     let tokens = $tokens;
     let subtree = grammar_rule!(@munch tokens $($subtree)+);
     match subtree {
     Ok((parsed_subtree_ast,leftover_tokens))=>{
-        println!("optional group: {} valid",stringify!($($subtree)+));
+        // println!("optional group: {} valid",stringify!($($subtree)+));
         //consume tokens for subtree
         let res = grammar_rule!(@munch leftover_tokens $($tail)*);
         match res {
@@ -299,7 +299,7 @@ macro_rules! grammar_rule {
         }
     },
     Err(_)=>{
-        println!("optional group: {} not valid",stringify!($($subtree)+));
+        // println!("optional group: {} not valid",stringify!($($subtree)+));
         //parse without consuming tokens for subtree
         let res = grammar_rule!(@munch tokens $($tail)*);
         match res {
@@ -312,7 +312,7 @@ macro_rules! grammar_rule {
 
     //PARENTHESIZED GROUP ( a b )
     (@munch $tokens:ident ($($subtree:tt)+) $($tail:tt)*) => {{
-    println!("parenthesized group");
+    // println!("parenthesized group");
     let mut tokens = $tokens;
     let subtree = grammar_rule!(@munch tokens $($subtree)+);
     match subtree {
@@ -337,7 +337,7 @@ macro_rules! grammar_rule {
         match $tokens.get(0) {
         Some(first_token)=>{
             if first_token.token == TokenType::$tt {
-                println!("{:?} found",TokenType::$tt);
+                // println!("{:?} found",TokenType::$tt);
                 let tokens = &$tokens[1..];
                 let subtree = grammar_rule!(@munch tokens $($tail)*);
                 match subtree {
@@ -347,7 +347,7 @@ macro_rules! grammar_rule {
                     Err(e) =>Err(e)
                 }
             } else {
-                println!("{:?} not found",TokenType::$tt);
+                // println!("{:?} not found",TokenType::$tt);
                 Err(LoxSyntaxError::UnexpectedToken{
                         lexeme: first_token.lexeme,
                         line: first_token.line,
@@ -364,7 +364,7 @@ macro_rules! grammar_rule {
     match $tokens.get(0) {
         Some(first_token)=>{
             if first_token.token == TokenType::$tt {
-                println!("{:?} found",TokenType::$tt);
+                // println!("{:?} found",TokenType::$tt);
                 let tokens = &$tokens[1..];
                 let subtree = grammar_rule!(@munch tokens $($tail)*);
                 match subtree {
@@ -374,7 +374,7 @@ macro_rules! grammar_rule {
                     Err(e) =>Err(e)
                 }
             } else {
-                println!("{:?} not found",TokenType::$tt);
+                // println!("{:?} not found",TokenType::$tt);
                 Err(LoxSyntaxError::UnexpectedToken{
                         lexeme: first_token.lexeme,
                         line: first_token.line,
@@ -391,11 +391,11 @@ macro_rules! grammar_rule {
     match $tokens.get(0) {
         Some(first_token)=>{
             if first_token.token == TokenType::$tt {
-                println!("{:?} found",TokenType::$tt);
+                // println!("{:?} found",TokenType::$tt);
                 let tokens = &$tokens[1..];
                 grammar_rule!(@munch tokens $($tail)*)
             } else {
-                println!("{:?} not found",TokenType::$tt);
+                // println!("{:?} not found",TokenType::$tt);
                 Err(LoxSyntaxError::UnexpectedToken{
                         lexeme: first_token.lexeme,
                         line: first_token.line,
@@ -663,7 +663,7 @@ impl Expression {
     grammar_rule!(Self::build_comparison : comparison -> [Expression::term] ( ( {GREATER} | {GREATER_EQUAL} | {LESS} | {LESS_EQUAL} ) [Expression::term] )* );
     grammar_rule!(Self::build_term : term -> [Expression::factor] ( ( {MINUS} | {PLUS} ) [Expression::factor] )* );
     grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
-    grammar_rule!(unary -> ( [Expression::recursive_unary] | [Expression::primary] | [Expression::call] ));
+    grammar_rule!(unary -> ( [Expression::recursive_unary] | [Expression::call]));
     grammar_rule!(Self::build_recursive_unary : recursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
     grammar_rule!(Self::build_call : 
         call -> [Expression::primary] ( ([MemberAccess::field_name] | [MemberAccess::function_name]) )* );
@@ -766,6 +766,10 @@ impl Expression {
         result
     }
     fn build_call((base,path): (Expression, Vec<MemberAccess>)) -> Self {
+        if path.is_empty(){
+            //special case: collapse call to primary expr
+            return base;
+        }
         Self::Call { base: Box::new(base), path }
     }
     fn build_recursive_unary((tt,expr): (TokenType, Expression)) -> Self {
@@ -1474,23 +1478,6 @@ fn test_parse_class_decl_inherit() {
 
 //things that don't work
 /*
-fun addPair(a, b) {
-  return a + b;
-}
-
-fun identity(a) {
-  return a;
-}
-
-print identity(addPair)(1, 2); // Prints \"3\".
- */
-/*
-var fn = returnFunction();
- */
-/*
-fn();
- */
-/*
 class Breakfast {
     init(meat, bread) {
         this.meat = meat;
@@ -1500,13 +1487,17 @@ class Breakfast {
     // ...
     }
  */
- /*
- var benedict = Brunch(\"ham\", \"English muffin\");
-  */
 #[test]
 fn test_parse_hello() {
     let sample = "
-    fn();
+    class Breakfast {
+        init(meat, bread) {
+            this.meat = meat;
+            this.bread = bread;
+        }
+        
+        // ...
+        }
     ";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
