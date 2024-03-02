@@ -493,7 +493,7 @@ enum Declaration {
     ClassDecl {
         name: String,
         parent_name: Option<String>,
-        body: Vec<()>,
+        body: Vec<Function>,
     },
     FunDecl(Function),
     VarDecl {
@@ -615,7 +615,7 @@ impl Declaration {
         Self::ClassDecl {
             name: ident.to_string(),
             parent_name: parent_name.map(|s| s.to_string()),
-            body: vec![],
+            body,
         }
     }
     fn build_fun_decl(data: Function) -> Self {
@@ -1483,21 +1483,93 @@ class Breakfast {
         this.meat = meat;
         this.bread = bread;
     }
-    
-    // ...
-    }
+}
  */
+
+ /*
+class Brunch < Breakfast {
+    init(meat, bread, drink) {
+        super.init(meat, bread);
+        this.drink = drink;
+    }
+}
+ */
+ 
 #[test]
-fn test_parse_hello() {
+fn test_parse_demo() {
     let sample = "
-    class Breakfast {
-        init(meat, bread) {
-            this.meat = meat;
-            this.bread = bread;
+    var a = 1;
+    var b = 2;
+
+    if (condition) {
+        print a;
+      } else {
+        print b;
+      }
+    while (a < 10) {
+      print a;
+      a = a + 1;
+    }
+
+    for (var a = 1; a < 10; a = a + 1) {
+        print a;
+      }
+
+      a.room(kitchen).makeBreakfast(bacon, eggs, toast)(hash_browns);
+
+      fun printSum(a, b) {
+        print a + b;
+      }
+      fun returnSum(a, b) {
+        return a + b;
+      }
+      
+      fun addPair(a, b) {
+        return a + b;
+      }
+      
+      fun identity(a) {
+        return a;
+      }
+      
+      print identity(addPair)(1, 2);
+
+      fun outerFunction() {
+        fun localFunction() {
+          print \"I'm local!\";
         }
-        
-        // ...
+      
+        localFunction();
+      }
+
+      fun returnFunction() {
+        var outside = \"outside\";
+      
+        fun inner() {
+          print outside;
         }
+      
+        return inner;
+      }
+      
+      var fn = returnFunction();
+      fn();
+
+      class Breakfast {
+        cook() {
+          print \"Eggs a-fryin'!\";
+        }
+      
+        serve(who) {
+          print \"Enjoy your breakfast, \" + who + \".\";
+        }
+      }
+
+      class Brunch < Breakfast {
+        drink() {
+          print \"How about a Bloody Mary?\";
+        }
+      }
     ";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
