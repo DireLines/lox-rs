@@ -475,8 +475,7 @@ enum Expression {
         right: Box<Expression>,
     },
     MemberAssign{
-        target:Option<Box<Expression>>,
-        field:String,
+        target:Box<Expression>,
         value: Box<Expression>,
     },
     Call {
@@ -656,7 +655,7 @@ impl MemberAccess {
 impl Expression {
     grammar_rule!(expression -> [Expression::assignment] );
     grammar_rule!(assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
-    grammar_rule!(Self::build_member_assign : member_assign -> ([Expression::call] DOT )? IDENTIFIER EQUAL [Expression::assignment]);
+    grammar_rule!(Self::build_member_assign : member_assign -> [Expression::call] EQUAL [Expression::assignment]);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
     grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
@@ -729,9 +728,8 @@ impl Expression {
         }
         result
     }
-    fn build_member_assign((call,ident,value): (Option<Expression>, &str, Expression)) -> Self {
-        let target = call.map(Box::new);
-        Self::MemberAssign { target: target, field: ident.to_string(), value: Box::new(value) }
+    fn build_member_assign((call, value): (Expression, Expression)) -> Self {
+        Self::MemberAssign { target: Box::new(call), value: Box::new(value) }
     }
     fn build_term((first,rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
         let token_type_to_op = |tt: TokenType| {
@@ -1475,26 +1473,6 @@ fn test_parse_class_decl_inherit() {
     );
 }
 
-
-//things that don't work
-/*
-class Breakfast {
-    init(meat, bread) {
-        this.meat = meat;
-        this.bread = bread;
-    }
-}
- */
-
- /*
-class Brunch < Breakfast {
-    init(meat, bread, drink) {
-        super.init(meat, bread);
-        this.drink = drink;
-    }
-}
- */
- 
 #[test]
 fn test_parse_demo() {
     let sample = "
@@ -1570,9 +1548,23 @@ fn test_parse_demo() {
           print \"How about a Bloody Mary?\";
         }
       }
+
+      class Breakfast {
+        init(meat, bread) {
+            this.meat = meat;
+            this.bread = bread;
+        }
+    }
+    class Brunch < Breakfast {
+        init(meat, bread, drink) {
+            super.init(meat, bread);
+            this.drink = drink;
+        }
+    }
     ";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Program::program(&tokens);
     println!("{:#?}",x);
 }
+
