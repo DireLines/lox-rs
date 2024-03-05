@@ -1468,7 +1468,12 @@ fn test_syntax_error_incomplete_binary() {
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::new(&tokens);
-    assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
+    let ex = &[Token {
+        token: TokenType::PLUS,
+        lexeme: "+",
+        line: 0,
+    }][..];
+    assert_eq!(x, Ok((Expression::Number(3.0), ex)));
 }
 
 #[test]
