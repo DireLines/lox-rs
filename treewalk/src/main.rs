@@ -145,7 +145,7 @@ macro_rules! grammar_rule {
                         Err(e) =>Err(e)
                     }
                 }
-                _ => { 
+                _ => {
                     // println!("IDENTIFIER not found");
                     Err(LoxSyntaxError::UnexpectedToken{
                     lexeme: first_token.lexeme,
@@ -173,7 +173,7 @@ macro_rules! grammar_rule {
                         Err(e) =>Err(e)
                     }
                 }
-                _ => { 
+                _ => {
                     // println!("NUMBER not found");
                     Err(LoxSyntaxError::UnexpectedToken{
                         lexeme: first_token.lexeme,
@@ -433,15 +433,13 @@ macro_rules! grammar_rule {
 
 #[derive(Debug, PartialEq, Clone)]
 struct Program {
-    body:Vec<Declaration>,
+    body: Vec<Declaration>,
 }
 
 impl Program {
     grammar_rule!(Self::build_program : program -> ([Declaration::declaration])*);
-    fn build_program(body: Vec<Declaration>)->Self{
-        Self {
-            body
-        }
+    fn build_program(body: Vec<Declaration>) -> Self {
+        Self { body }
     }
 }
 
@@ -474,8 +472,8 @@ enum Expression {
         operator: UnaryOperator,
         right: Box<Expression>,
     },
-    MemberAssign{
-        target:Box<Expression>,
+    MemberAssign {
+        target: Box<Expression>,
         value: Box<Expression>,
     },
     Call {
@@ -483,8 +481,8 @@ enum Expression {
         path: Vec<MemberAccess>,
     },
     SuperFieldAccess {
-        field:String,
-    }
+        field: String,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -505,25 +503,25 @@ enum Declaration {
 #[derive(Debug, PartialEq, Clone)]
 enum Statement {
     ExprStmt(Expression),
-    ForStmt{
-        stmt:Box<Statement>,
-        condition:Box<Option<Expression>>,
-        increment:Box<Option<Expression>>,
-        body:Box<Statement>,
+    ForStmt {
+        stmt: Box<Statement>,
+        condition: Box<Option<Expression>>,
+        increment: Box<Option<Expression>>,
+        body: Box<Statement>,
     },
-    IfStmt{
-        condition:Box<Expression>,
-        if_case:Box<Statement>,
-        else_case:Box<Option<Statement>>
+    IfStmt {
+        condition: Box<Expression>,
+        if_case: Box<Statement>,
+        else_case: Box<Option<Statement>>,
     },
     PrintStmt(Expression),
     ReturnStmt(Option<Expression>),
-    WhileStmt{
+    WhileStmt {
         condition: Box<Expression>,
         body: Box<Statement>,
     },
-    Block{
-        body: Vec<Declaration>
+    Block {
+        body: Vec<Declaration>,
     },
     VarDecl(Declaration),
     EmptyStmt,
@@ -550,7 +548,7 @@ impl Statement {
     fn build_expr_stmt(expr: Expression) -> Self {
         Self::ExprStmt(expr)
     }
-    fn build_var_decl(decl:Declaration) -> Self {
+    fn build_var_decl(decl: Declaration) -> Self {
         Self::VarDecl(decl)
     }
     // fn varDecl<'a>(
@@ -559,11 +557,29 @@ impl Statement {
     //     todo!()
     // }
 
-    fn build_for_stmt((stmt,condition,increment,body): (Statement, Option<Expression>, Option<Expression>, Statement)) -> Self {
-        Self::ForStmt { stmt: Box::new(stmt), condition: Box::new(condition), increment: Box::new(increment), body: Box::new(body) }
+    fn build_for_stmt(
+        (stmt, condition, increment, body): (
+            Statement,
+            Option<Expression>,
+            Option<Expression>,
+            Statement,
+        ),
+    ) -> Self {
+        Self::ForStmt {
+            stmt: Box::new(stmt),
+            condition: Box::new(condition),
+            increment: Box::new(increment),
+            body: Box::new(body),
+        }
     }
-    fn build_if_stmt((condition,if_case,else_case): (Expression, Statement, Option<Statement>)) -> Self {
-        Self::IfStmt { condition:Box::new(condition), if_case: Box::new(if_case), else_case: Box::new(else_case) }
+    fn build_if_stmt(
+        (condition, if_case, else_case): (Expression, Statement, Option<Statement>),
+    ) -> Self {
+        Self::IfStmt {
+            condition: Box::new(condition),
+            if_case: Box::new(if_case),
+            else_case: Box::new(else_case),
+        }
     }
     fn build_print_stmt(expr: Expression) -> Self {
         Self::PrintStmt(expr)
@@ -571,8 +587,11 @@ impl Statement {
     fn build_return_stmt(value: Option<Expression>) -> Self {
         Self::ReturnStmt(value)
     }
-    fn build_while_stmt((condition,body): (Expression, Statement)) -> Self {
-        Self::WhileStmt { condition: Box::new(condition), body: Box::new(body) }
+    fn build_while_stmt((condition, body): (Expression, Statement)) -> Self {
+        Self::WhileStmt {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        }
     }
     fn build_block(decls: Vec<Declaration>) -> Self {
         Self::Block { body: decls }
@@ -586,7 +605,9 @@ struct Function {
 }
 impl Function {
     grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN ([Statement::block])?);
-    fn build_function((name,params,stmt): (&str, Option<(&str, Vec<&str>)>, Option<Statement>)) -> Self {
+    fn build_function(
+        (name, params, stmt): (&str, Option<(&str, Vec<&str>)>, Option<Statement>),
+    ) -> Self {
         let params = if let Some((first_param, other_params)) = params {
             let mut params: Vec<String> = other_params.iter().map(|e| e.to_string()).collect();
             params.insert(0, first_param.to_owned());
@@ -634,16 +655,16 @@ impl Declaration {
 #[derive(Debug, PartialEq, Clone)]
 enum MemberAccess {
     Field(String),
-    Args{args:Vec<Expression>}
+    Args { args: Vec<Expression> },
 }
 
 impl MemberAccess {
     grammar_rule!(Self::build_function_name : function_name ->  LEFT_PAREN ([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN);
     grammar_rule!(Self::build_field_name : field_name -> DOT IDENTIFIER);
     fn build_function_name(data: Option<(Expression, Vec<Expression>)>) -> Self {
-        let args = data.map_or(Vec::new(), |(first,mut rest)| {
-            rest.insert(0,first);
-            rest 
+        let args = data.map_or(Vec::new(), |(first, mut rest)| {
+            rest.insert(0, first);
+            rest
         });
         MemberAccess::Args { args }
     }
@@ -664,7 +685,7 @@ impl Expression {
     grammar_rule!(Self::build_factor : factor -> [Expression::unary] ( ( {SLASH} | {STAR} ) [Expression::unary] )* );
     grammar_rule!(unary -> ( [Expression::recursive_unary] | [Expression::call]));
     grammar_rule!(Self::build_recursive_unary : recursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
-    grammar_rule!(Self::build_call : 
+    grammar_rule!(Self::build_call :
         call -> [Expression::primary] ( ([MemberAccess::field_name] | [MemberAccess::function_name]) )* );
     grammar_rule!(primary ->
         ({TRUE:Expression::Bool(true)} |
@@ -681,14 +702,22 @@ impl Expression {
     fn build_logic_or((first, rest): (Expression, Vec<Expression>)) -> Self {
         let mut result = first;
         for expr in rest {
-            result = Self::Binary { left: Box::new(result), operator:  BinaryOperator::Or, right: Box::new(expr) }
+            result = Self::Binary {
+                left: Box::new(result),
+                operator: BinaryOperator::Or,
+                right: Box::new(expr),
+            }
         }
         result
     }
     fn build_logic_and((first, rest): (Expression, Vec<Expression>)) -> Self {
         let mut result = first;
         for expr in rest {
-            result = Self::Binary { left: Box::new(result), operator:  BinaryOperator::And, right: Box::new(expr) }
+            result = Self::Binary {
+                left: Box::new(result),
+                operator: BinaryOperator::And,
+                right: Box::new(expr),
+            }
         }
         result
     }
@@ -703,8 +732,12 @@ impl Expression {
             }
         };
         let mut result = first;
-        for (tt,expr) in rest {
-            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
+        for (tt, expr) in rest {
+            result = Self::Binary {
+                left: Box::new(result),
+                operator: token_type_to_op(tt),
+                right: Box::new(expr),
+            }
         }
         result
     }
@@ -716,22 +749,29 @@ impl Expression {
                 BinaryOperator::GreaterEqual
             } else if tt == TokenType::LESS {
                 BinaryOperator::Less
-            }else if tt == TokenType::LESS_EQUAL {
+            } else if tt == TokenType::LESS_EQUAL {
                 BinaryOperator::LessEqual
-            }else {
+            } else {
                 unreachable!();
             }
         };
         let mut result = first;
-        for (tt,expr) in rest {
-            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
+        for (tt, expr) in rest {
+            result = Self::Binary {
+                left: Box::new(result),
+                operator: token_type_to_op(tt),
+                right: Box::new(expr),
+            }
         }
         result
     }
     fn build_member_assign((call, value): (Expression, Expression)) -> Self {
-        Self::MemberAssign { target: Box::new(call), value: Box::new(value) }
+        Self::MemberAssign {
+            target: Box::new(call),
+            value: Box::new(value),
+        }
     }
-    fn build_term((first,rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
+    fn build_term((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
         let token_type_to_op = |tt: TokenType| {
             if tt == TokenType::PLUS {
                 BinaryOperator::Plus
@@ -742,12 +782,16 @@ impl Expression {
             }
         };
         let mut result = first;
-        for (tt,expr) in rest {
-            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
+        for (tt, expr) in rest {
+            result = Self::Binary {
+                left: Box::new(result),
+                operator: token_type_to_op(tt),
+                right: Box::new(expr),
+            }
         }
         result
     }
-    fn build_factor((first,rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
+    fn build_factor((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
         let token_type_to_op = |tt: TokenType| {
             if tt == TokenType::SLASH {
                 BinaryOperator::Div
@@ -758,36 +802,46 @@ impl Expression {
             }
         };
         let mut result = first;
-        for (tt,expr) in rest {
-            result = Self::Binary { left: Box::new(result), operator: token_type_to_op(tt), right: Box::new(expr) }
+        for (tt, expr) in rest {
+            result = Self::Binary {
+                left: Box::new(result),
+                operator: token_type_to_op(tt),
+                right: Box::new(expr),
+            }
         }
         result
     }
-    fn build_call((base,path): (Expression, Vec<MemberAccess>)) -> Self {
-        if path.is_empty(){
+    fn build_call((base, path): (Expression, Vec<MemberAccess>)) -> Self {
+        if path.is_empty() {
             //special case: collapse call to primary expr
             return base;
         }
-        Self::Call { base: Box::new(base), path }
+        Self::Call {
+            base: Box::new(base),
+            path,
+        }
     }
-    fn build_recursive_unary((tt,expr): (TokenType, Expression)) -> Self {
+    fn build_recursive_unary((tt, expr): (TokenType, Expression)) -> Self {
         let token_type_to_op = |tt: TokenType| {
             if tt == TokenType::MINUS {
-               UnaryOperator::Neg
+                UnaryOperator::Neg
             } else if tt == TokenType::BANG {
                 UnaryOperator::Not
             } else {
                 unreachable!();
             }
         };
-        Self::Unary { operator: token_type_to_op(tt), right: Box::new(expr) }
+        Self::Unary {
+            operator: token_type_to_op(tt),
+            right: Box::new(expr),
+        }
     }
     fn build_ident(data: &str) -> Self {
         Self::Identifier(data.to_string())
     }
     fn build_super_field_access(ident: &str) -> Self {
         Self::SuperFieldAccess {
-            field:ident.to_string()
+            field: ident.to_string(),
         }
     }
 }
@@ -1335,10 +1389,7 @@ fn test_parse_expr() {
     let mut scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::unary(&tokens);
-    assert_eq!(
-        x.unwrap().0,
-        Expression::Number(3.0),
-    );
+    assert_eq!(x.unwrap().0, Expression::Number(3.0),);
 }
 
 #[test]
@@ -1501,35 +1552,35 @@ fn test_parse_demo() {
       fun returnSum(a, b) {
         return a + b;
       }
-      
+
       fun addPair(a, b) {
         return a + b;
       }
-      
+
       fun identity(a) {
         return a;
       }
-      
+
       print identity(addPair)(1, 2);
 
       fun outerFunction() {
         fun localFunction() {
           print \"I'm local!\";
         }
-      
+
         localFunction();
       }
 
       fun returnFunction() {
         var outside = \"outside\";
-      
+
         fun inner() {
           print outside;
         }
-      
+
         return inner;
       }
-      
+
       var fn = returnFunction();
       fn();
 
@@ -1537,7 +1588,7 @@ fn test_parse_demo() {
         cook() {
           print \"Eggs a-fryin'!\";
         }
-      
+
         serve(who) {
           print \"Enjoy your breakfast, \" + who + \".\";
         }
@@ -1565,6 +1616,5 @@ fn test_parse_demo() {
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Program::program(&tokens);
-    println!("{:#?}",x);
+    println!("{:#?}", x);
 }
-
