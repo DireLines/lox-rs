@@ -1086,7 +1086,7 @@ impl<'a> Iterator for Scanner<'a> {
                 }
                 self.next_unparsed += num_chars;
                 return Some(Token {
-                    token: TokenType::NUMBER((&unparsed[0..num_chars]).parse().unwrap()),
+                    token: TokenType::NUMBER(unparsed[0..num_chars].parse().unwrap()),
                     lexeme: &unparsed[0..num_chars],
                     line: self.line,
                 });
