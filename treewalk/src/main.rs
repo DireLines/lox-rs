@@ -1105,19 +1105,16 @@ impl<'a> Iterator for Scanner<'a> {
                 }
                 self.next_unparsed += num_chars;
                 let lexeme = &unparsed[0..num_chars];
-                if let Some(&token_type) = KEYWORDS.get(lexeme) {
-                    return Some(Token {
-                        token: token_type,
-                        lexeme,
-                        line: self.line,
-                    });
-                } else {
-                    return Some(Token {
-                        token: TokenType::IDENTIFIER(lexeme),
-                        lexeme,
-                        line: self.line,
-                    });
-                }
+                let token = KEYWORDS
+                    .get(lexeme)
+                    .copied()
+                    .unwrap_or(TokenType::IDENTIFIER(lexeme));
+
+                return Some(Token {
+                    token,
+                    lexeme,
+                    line: self.line,
+                });
             }
             panic!("Unexpected input: {:?}!", c);
         }
