@@ -1133,7 +1133,7 @@ struct Token<'a> {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[rustfmt::skip]
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 enum TokenType<'a> {
     // Single-character tokens.
     LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
