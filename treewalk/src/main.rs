@@ -1072,22 +1072,17 @@ impl<'a> Iterator for Scanner<'a> {
             if c.is_ascii_digit() {
                 //number literal
                 let mut num_chars = 0;
-                let unparsed_chars = &mut unparsed.chars();
                 let mut found_dot = false;
                 //integer part
-                loop {
-                    match unparsed_chars.next() {
-                        Some(c) => {
-                            if c.is_ascii_digit() {
-                                num_chars += 1;
-                            } else if c == '.' && !found_dot {
-                                num_chars += 1;
-                                found_dot = true;
-                            } else {
-                                break;
-                            }
-                        }
-                        None => break,
+
+                for c in unparsed.chars() {
+                    if c.is_ascii_digit() {
+                        num_chars += 1;
+                    } else if c == '.' && !found_dot {
+                        num_chars += 1;
+                        found_dot = true;
+                    } else {
+                        break;
                     }
                 }
                 self.next_unparsed += num_chars;
@@ -1102,17 +1097,11 @@ impl<'a> Iterator for Scanner<'a> {
             if is_alpha(c) {
                 //ident or keyword
                 let mut num_chars = 0;
-                let unparsed_chars = &mut unparsed.chars();
-                loop {
-                    match unparsed_chars.next() {
-                        Some(c) => {
-                            if is_alphanumeric(c) {
-                                num_chars += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                        None => break,
+                for c in unparsed.chars() {
+                    if is_alphanumeric(c) {
+                        num_chars += 1;
+                    } else {
+                        break;
                     }
                 }
                 self.next_unparsed += num_chars;
