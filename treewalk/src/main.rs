@@ -1172,7 +1172,7 @@ enum TokenType<'a> {
 
 fn run(source: &str) {
     //make a Scanner
-    let mut scanner = Scanner::new(source);
+    let scanner = Scanner::new(source);
     //get tokens from scanner
     for token in scanner {
         println!("{token:#?}");
@@ -1184,7 +1184,7 @@ fn run(source: &str) {
 #[test]
 fn test_simple_lexer() {
     let sample = "> << / //  this is a comment\n> / +";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let x = scanner.collect::<Vec<_>>();
     use TokenType::*;
     assert_eq!(
@@ -1232,7 +1232,7 @@ fn test_simple_lexer() {
 #[test]
 fn test_string_literal() {
     let sample = " > \"multiline\nstring\nliteral\" > ";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let x = scanner.collect::<Vec<_>>();
     use TokenType::*;
     assert_eq!(
@@ -1260,7 +1260,7 @@ fn test_string_literal() {
 #[test]
 fn test_number_literal() {
     let sample = " = 5 35.3 0.32.33 -4 = ";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let x = scanner.collect::<Vec<_>>();
     use TokenType::*;
     assert_eq!(
@@ -1318,7 +1318,7 @@ fn test_number_literal() {
 #[test]
 fn test_keyword_ident() {
     let sample = "var x = 5;\n var y = -x;";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let x = scanner.collect::<Vec<_>>();
     use TokenType::*;
     assert_eq!(
@@ -1386,7 +1386,7 @@ fn test_keyword_ident() {
 #[test]
 fn test_parse_expr() {
     let sample = "(3)";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::unary(&tokens);
     assert_eq!(x.unwrap().0, Expression::Number(3.0),);
@@ -1395,7 +1395,7 @@ fn test_parse_expr() {
 #[test]
 fn test_parse_binary() {
     let sample = "3 * 4";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::expression(&tokens);
     assert_eq!(
@@ -1411,7 +1411,7 @@ fn test_parse_binary() {
 #[test]
 fn test_parse_binary_assoc() {
     let sample = "3 * 4 * 5";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::expression(&tokens);
     use crate::Expression::*;
@@ -1432,7 +1432,7 @@ fn test_parse_binary_assoc() {
 #[test]
 fn test_syntax_error_unexpected() {
     let sample = "/";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::expression(&tokens);
     assert_eq!(
@@ -1448,7 +1448,7 @@ fn test_syntax_error_unexpected() {
 #[test]
 fn test_syntax_error_unexpected_paren() {
     let sample = ")";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::expression(&tokens);
     assert_eq!(
@@ -1464,7 +1464,7 @@ fn test_syntax_error_unexpected_paren() {
 #[test]
 fn test_syntax_error_missing_paren() {
     let sample = "(1 2";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::expression(&tokens);
     assert_eq!(
@@ -1480,7 +1480,7 @@ fn test_syntax_error_missing_paren() {
 #[test]
 fn test_syntax_error_incomplete_binary() {
     let sample = "3 +";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::expression(&tokens);
     assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
@@ -1489,7 +1489,7 @@ fn test_syntax_error_incomplete_binary() {
 #[test]
 fn test_parse_class_decl_no_inherit() {
     let sample = "class Foo {}";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::class_decl(&tokens);
     assert_eq!(
@@ -1508,7 +1508,7 @@ fn test_parse_class_decl_no_inherit() {
 #[test]
 fn test_parse_class_decl_inherit() {
     let sample = "class Foo < Bar {}";
-    let mut scanner = Scanner::new(sample);
+    let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Declaration::class_decl(&tokens);
     assert_eq!(
