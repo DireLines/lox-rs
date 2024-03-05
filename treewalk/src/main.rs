@@ -436,7 +436,7 @@ struct Program {
 }
 
 impl Program {
-    grammar_rule!(Self::build_program : program -> ([Declaration::declaration])*);
+    grammar_rule!(Self::build_program : new -> ([Declaration::new])*);
     fn build_program(body: Vec<Declaration>) -> Self {
         Self { body }
     }
@@ -527,17 +527,17 @@ enum Statement {
 }
 
 impl Statement {
-    grammar_rule!(statement -> ([Statement::expr_stmt] | [Statement::for_stmt] | [Statement::if_stmt] | [Statement::print_stmt] | [Statement::return_stmt] | [Statement::while_stmt] | [Statement::block]) );
-    grammar_rule!(Self::build_expr_stmt : expr_stmt -> [Expression::expression] SEMICOLON );
+    grammar_rule!(new -> ([Statement::expr_stmt] | [Statement::for_stmt] | [Statement::if_stmt] | [Statement::print_stmt] | [Statement::return_stmt] | [Statement::while_stmt] | [Statement::block]) );
+    grammar_rule!(Self::build_expr_stmt : expr_stmt -> [Expression::new] SEMICOLON );
     grammar_rule!(Self::build_for_stmt : for_stmt -> FOR LEFT_PAREN
         ( [Statement::var_decl] | [Statement::expr_stmt] | [Statement::empty_stmt] )
-        ( [Expression::expression] )? SEMICOLON
-        ( [Expression::expression] )? RIGHT_PAREN [Statement::statement] );
-    grammar_rule!(Self::build_if_stmt : if_stmt -> IF LEFT_PAREN [Expression::expression] RIGHT_PAREN [Statement::statement] ( ELSE [Statement::statement] )? );
-    grammar_rule!(Self::build_print_stmt : print_stmt -> PRINT [Expression::expression] SEMICOLON );
-    grammar_rule!(Self::build_return_stmt : return_stmt -> RETURN ([Expression::expression])? SEMICOLON );
-    grammar_rule!(Self::build_while_stmt : while_stmt -> WHILE LEFT_PAREN [Expression::expression] RIGHT_PAREN [Statement::statement] );
-    grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::declaration])* RIGHT_BRACE );
+        ( [Expression::new] )? SEMICOLON
+        ( [Expression::new] )? RIGHT_PAREN [Statement::new] );
+    grammar_rule!(Self::build_if_stmt : if_stmt -> IF LEFT_PAREN [Expression::new] RIGHT_PAREN [Statement::new] ( ELSE [Statement::new] )? );
+    grammar_rule!(Self::build_print_stmt : print_stmt -> PRINT [Expression::new] SEMICOLON );
+    grammar_rule!(Self::build_return_stmt : return_stmt -> RETURN ([Expression::new])? SEMICOLON );
+    grammar_rule!(Self::build_while_stmt : while_stmt -> WHILE LEFT_PAREN [Expression::new] RIGHT_PAREN [Statement::new] );
+    grammar_rule!(Self::build_block : block -> LEFT_BRACE ([Declaration::new])* RIGHT_BRACE );
     grammar_rule!(Self::build_empty_stmt : empty_stmt -> SEMICOLON);
     grammar_rule!(Self::build_var_decl : var_decl -> [Declaration::var_decl]);
 
@@ -603,7 +603,7 @@ struct Function {
     body: Box<Option<Statement>>,
 }
 impl Function {
-    grammar_rule!(Self::build_function : function -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN ([Statement::block])?);
+    grammar_rule!(Self::build_function : new -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN ([Statement::block])?);
     fn build_function(
         (name, params, stmt): (&str, Option<(&str, Vec<&str>)>, Option<Statement>),
     ) -> Self {
@@ -623,11 +623,11 @@ impl Function {
 }
 
 impl Declaration {
-    grammar_rule!(declaration -> ([Declaration::class_decl] | [Declaration::fun_decl] | [Declaration::var_decl] | [Declaration::statement]) );
-    grammar_rule!(Self::build_class_decl : class_decl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::function])* RIGHT_BRACE);
-    grammar_rule!(Self::build_fun_decl : fun_decl -> FUN [Function::function] );
-    grammar_rule!(Self::build_var_decl : var_decl -> VAR IDENTIFIER ( EQUAL [Expression::expression] )? SEMICOLON );
-    grammar_rule!(Self::build_statement : statement -> [Statement::statement]);
+    grammar_rule!(new -> ([Declaration::class_decl] | [Declaration::fun_decl] | [Declaration::var_decl] | [Declaration::statement]) );
+    grammar_rule!(Self::build_class_decl : class_decl -> CLASS IDENTIFIER ( LESS IDENTIFIER )? LEFT_BRACE ([Function::new])* RIGHT_BRACE);
+    grammar_rule!(Self::build_fun_decl : fun_decl -> FUN [Function::new] );
+    grammar_rule!(Self::build_var_decl : var_decl -> VAR IDENTIFIER ( EQUAL [Expression::new] )? SEMICOLON );
+    grammar_rule!(Self::build_statement : statement -> [Statement::new]);
 
     fn build_class_decl(data: (&str, Option<&str>, Vec<Function>)) -> Self {
         let (ident, parent_name, body) = data;
@@ -658,7 +658,7 @@ enum MemberAccess {
 }
 
 impl MemberAccess {
-    grammar_rule!(Self::build_function_name : function_name ->  LEFT_PAREN ([Expression::expression] ( COMMA [Expression::expression] )* )? RIGHT_PAREN);
+    grammar_rule!(Self::build_function_name : function_name ->  LEFT_PAREN ([Expression::new] ( COMMA [Expression::new] )* )? RIGHT_PAREN);
     grammar_rule!(Self::build_field_name : field_name -> DOT IDENTIFIER);
     fn build_function_name(data: Option<(Expression, Vec<Expression>)>) -> Self {
         let args = data.map_or(Vec::new(), |(first, mut rest)| {
@@ -673,7 +673,7 @@ impl MemberAccess {
 }
 
 impl Expression {
-    grammar_rule!(expression -> [Expression::assignment] );
+    grammar_rule!(new -> [Expression::assignment] );
     grammar_rule!(assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
     grammar_rule!(Self::build_member_assign : member_assign -> [Expression::call] EQUAL [Expression::assignment]);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
@@ -694,7 +694,7 @@ impl Expression {
          NUMBER |
          STRING |
          [Expression::identifier] |
-         (LEFT_PAREN [Expression::expression] RIGHT_PAREN) |
+         (LEFT_PAREN [Expression::new] RIGHT_PAREN) |
          [Expression::super_field_access] ));
     grammar_rule!(Self::build_ident : identifier -> IDENTIFIER);
     grammar_rule!(Self::build_super_field_access : super_field_access -> SUPER DOT IDENTIFIER);
@@ -1385,7 +1385,7 @@ fn test_parse_binary() {
     let sample = "3 * 4";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::expression(&tokens);
+    let x = Expression::new(&tokens);
     assert_eq!(
         x.unwrap().0,
         Expression::Binary {
@@ -1401,7 +1401,7 @@ fn test_parse_binary_assoc() {
     let sample = "3 * 4 * 5";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::expression(&tokens);
+    let x = Expression::new(&tokens);
     use crate::Expression::*;
     assert_eq!(
         x.unwrap().0,
@@ -1422,7 +1422,7 @@ fn test_syntax_error_unexpected() {
     let sample = "/";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::expression(&tokens);
+    let x = Expression::new(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -1438,7 +1438,7 @@ fn test_syntax_error_unexpected_paren() {
     let sample = ")";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::expression(&tokens);
+    let x = Expression::new(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -1454,7 +1454,7 @@ fn test_syntax_error_missing_paren() {
     let sample = "(1 2";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::expression(&tokens);
+    let x = Expression::new(&tokens);
     assert_eq!(
         x,
         Err(LoxSyntaxError::UnexpectedToken {
@@ -1470,7 +1470,7 @@ fn test_syntax_error_incomplete_binary() {
     let sample = "3 +";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::expression(&tokens);
+    let x = Expression::new(&tokens);
     assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
 }
 
@@ -1603,6 +1603,6 @@ fn test_parse_demo() {
     ";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Program::program(&tokens);
+    let x = Program::new(&tokens);
     println!("{:#?}", x);
 }
