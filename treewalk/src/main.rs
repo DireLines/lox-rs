@@ -892,13 +892,13 @@ const KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 fn main() -> Result<()> {
     let args: Vec<String> = args().collect();
-    if args.len() > 2 {
-        println!("Usage: lox [script]");
-        return Ok(());
-    } else if args.len() == 2 {
-        run_file(&args[1])?;
-    } else {
-        run_prompt();
+    match &args[1..] {
+        &[] => run_prompt()?,
+        [file] => run_file(file)?,
+        _ => {
+            println!("Usage: lox [script]");
+            return Ok(());
+        }
     }
     Ok(())
 }
