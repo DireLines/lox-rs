@@ -725,7 +725,7 @@ impl Expression {
             if tt == TokenType::EQUAL_EQUAL {
                 BinaryOperator::EqualEqual
             } else if tt == TokenType::BANG_EQUAL {
-                BinaryOperator::BangEqual
+                BinaryOperator::NotEqual
             } else {
                 unreachable!();
             }
@@ -852,7 +852,6 @@ enum UnaryOperator {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-#[allow(non_camel_case_types)]
 enum BinaryOperator {
     Minus,
     Plus,
@@ -860,7 +859,7 @@ enum BinaryOperator {
     Mul,
     Equal,
     EqualEqual,
-    BangEqual,
+    NotEqual,
     Greater,
     GreaterEqual,
     Less,
