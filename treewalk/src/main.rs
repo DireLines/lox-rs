@@ -109,8 +109,6 @@ macro_rules! grammar_rule {
         fn $functionname<'a>(
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-            let desc = format!("{}::{}",std::any::type_name::<Self>(),stringify!($functionname));
-            // println!("{desc}");
             let res = grammar_rule!(@munch tokens $($tail)*);
             match res {
                 Ok((body,tokens))=>{
