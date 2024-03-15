@@ -29,4 +29,5 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
 7. [Evaluating Expressions](https://craftinginterpreters.com/evaluating-expressions.html)
     - 2024-02-08 [video](https://www.youtube.com/watch?v=wyo6Ak291lQ&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=12)
     - 2024-02-22 [video](https://www.youtube.com/watch?v=SEu7bQN9Txw&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=13)
-    
+8. [Statements and State](https://craftinginterpreters.com/statements-and-state.html)
+    - 2024-03-14 [video](https://www.youtube.com/watch?v=O74mleTLbQw&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=14)
