@@ -673,7 +673,7 @@ impl MemberAccess {
 impl Expression {
     grammar_rule!(new -> [Expression::assignment] );
     grammar_rule!(assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
-    grammar_rule!(Self::build_member_assign : member_assign -> [Expression::call] EQUAL [Expression::assignment]);
+    grammar_rule!(Self::build_member_assign : member_assign -> ([Expression::call] DOT)? IDENTIFIER EQUAL [Expression::assignment]);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
     grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
@@ -762,10 +762,15 @@ impl Expression {
         }
         result
     }
-    fn build_member_assign((call, value): (Expression, Expression)) -> Self {
-        Self::MemberAssign {
-            target: Box::new(call),
-            value: Box::new(value),
+
+    fn build_member_assign((call, ident, value): (Option<Expression>, &str, Expression)) -> Self {
+        if let Some(member) = call {
+            Self::MemberAssign {
+                target: Box::new(member),
+                value: Box::new(value),
+            }
+        } else {
+            todo!()
         }
     }
     fn build_term((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
@@ -1191,6 +1196,24 @@ where
 #[cfg(test)]
 mod tests_expr {
 
+    // expression     → assignment ;
+    //
+    // assignment     → ( call "." )? IDENTIFIER "=" assignment
+    //                | logic_or ;
+    //
+    // logic_or       → logic_and ( "or" logic_and )* ;
+    // logic_and      → equality ( "and" equality )* ;
+    // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+    // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+    // term           → factor ( ( "-" | "+" ) factor )* ;
+    // factor         → unary ( ( "/" | "*" ) unary )* ;
+    //
+    // unary          → ( "!" | "-" ) unary | call ;
+    // call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+    // primary        → "true" | "false" | "nil" | "this"
+    //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+    //                | "super" "." IDENTIFIER ;
+
     /// assignment     → ( call "." )? IDENTIFIER "=" assignment
     ///                | logic_or ;
     mod assignment {
@@ -1205,6 +1228,12 @@ mod tests_expr {
                 },
                 parse_str_with("time = money", Expression::new)
             );
+        }
+
+        #[test]
+        #[should_panic]
+        fn this_should_fail() {
+            parse_str_with("2 = 3", Expression::assignment);
         }
     }
 
