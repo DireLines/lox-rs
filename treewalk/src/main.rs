@@ -109,8 +109,6 @@ macro_rules! grammar_rule {
         fn $functionname<'a>(
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-            let desc = format!("{}::{}",std::any::type_name::<Self>(),stringify!($functionname));
-            // println!("{desc}");
             let res = grammar_rule!(@munch tokens $($tail)*);
             match res {
                 Ok((body,tokens))=>{
@@ -675,7 +673,7 @@ impl MemberAccess {
 impl Expression {
     grammar_rule!(new -> [Expression::assignment] );
     grammar_rule!(assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
-    grammar_rule!(Self::build_member_assign : member_assign -> [Expression::call] EQUAL [Expression::assignment]);
+    grammar_rule!(Self::build_member_assign : member_assign -> ([Expression::call] DOT)? IDENTIFIER EQUAL [Expression::assignment]);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
     grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
@@ -725,7 +723,7 @@ impl Expression {
             if tt == TokenType::EQUAL_EQUAL {
                 BinaryOperator::EqualEqual
             } else if tt == TokenType::BANG_EQUAL {
-                BinaryOperator::BangEqual
+                BinaryOperator::NotEqual
             } else {
                 unreachable!();
             }
@@ -764,10 +762,15 @@ impl Expression {
         }
         result
     }
-    fn build_member_assign((call, value): (Expression, Expression)) -> Self {
-        Self::MemberAssign {
-            target: Box::new(call),
-            value: Box::new(value),
+
+    fn build_member_assign((call, ident, value): (Option<Expression>, &str, Expression)) -> Self {
+        if let Some(member) = call {
+            Self::MemberAssign {
+                target: Box::new(member),
+                value: Box::new(value),
+            }
+        } else {
+            todo!()
         }
     }
     fn build_term((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
@@ -852,7 +855,6 @@ enum UnaryOperator {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-#[allow(non_camel_case_types)]
 enum BinaryOperator {
     Minus,
     Plus,
@@ -860,7 +862,7 @@ enum BinaryOperator {
     Mul,
     Equal,
     EqualEqual,
-    BangEqual,
+    NotEqual,
     Greater,
     GreaterEqual,
     Less,
@@ -1164,6 +1166,316 @@ fn run(source: &str) {
     }
     //print tokens
     println!("running on {source}");
+}
+
+/// Apply a parser directly to a string, confirm that there are no leftovers
+///
+/// Assumes parser should not produce any leftovers
+#[cfg(test)]
+fn parse_str_with<F, T>(input: &str, parser: F) -> T
+where
+    F: for<'a> Fn(&'a [Token<'a>]) -> std::result::Result<(T, &'a [Token<'a>]), LoxSyntaxError<'a>>,
+    T: std::fmt::Debug,
+{
+    let scanner = Scanner::new(input);
+    let tokens = scanner.collect::<Vec<_>>();
+    match parser(&tokens) {
+        Ok((expr, leftovers)) => {
+            if leftovers.is_empty() {
+                expr
+            } else {
+                panic!("Managed to parse {input:?} into {expr:?}, but there are leftovers: {leftovers:?}");
+            }
+        }
+        Err(err) => {
+            panic!("Failed to parse {input:?} into expression: {err:?}")
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_expr {
+
+    // expression     → assignment ;
+    //
+    // assignment     → ( call "." )? IDENTIFIER "=" assignment
+    //                | logic_or ;
+    //
+    // logic_or       → logic_and ( "or" logic_and )* ;
+    // logic_and      → equality ( "and" equality )* ;
+    // equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+    // comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+    // term           → factor ( ( "-" | "+" ) factor )* ;
+    // factor         → unary ( ( "/" | "*" ) unary )* ;
+    //
+    // unary          → ( "!" | "-" ) unary | call ;
+    // call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+    // primary        → "true" | "false" | "nil" | "this"
+    //                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+    //                | "super" "." IDENTIFIER ;
+
+    /// assignment     → ( call "." )? IDENTIFIER "=" assignment
+    ///                | logic_or ;
+    mod assignment {
+        use super::super::*;
+
+        #[test]
+        fn simple_assignment() {
+            assert_eq!(
+                Expression::MemberAssign {
+                    target: Box::new(Expression::Identifier("time".into())),
+                    value: Box::new(Expression::Identifier("money".into()))
+                },
+                parse_str_with("time = money", Expression::new)
+            );
+        }
+
+        #[test]
+        #[should_panic]
+        fn this_should_fail() {
+            parse_str_with("2 = 3", Expression::assignment);
+        }
+    }
+
+    /// logic_or       → logic_and ( "or" logic_and )* ;
+    mod logic_or {
+        use super::super::*;
+        #[test]
+        fn simple_logic() {
+            assert_eq!(
+                Expression::Binary {
+                    left: Box::new(Expression::Binary {
+                        left: Box::new(Expression::Identifier("coffee".into())),
+                        operator: BinaryOperator::Or,
+                        right: Box::new(Expression::Identifier("tea".into())),
+                    }),
+                    operator: BinaryOperator::Or,
+                    right: Box::new(Expression::Identifier("me".into())),
+                },
+                parse_str_with("coffee or tea or me", Expression::new)
+            )
+        }
+    }
+
+    /// logic_and      → equality ( "and" equality )* ;
+    mod logic_and {
+        use super::super::*;
+        #[test]
+        fn simple_logic() {
+            assert_eq!(
+                Expression::Binary {
+                    left: Box::new(Expression::Identifier("Egg".into())),
+                    operator: BinaryOperator::And,
+                    right: Box::new(Expression::Identifier("spam".into())),
+                },
+                parse_str_with("Egg and spam", Expression::new)
+            )
+        }
+    }
+
+    /// equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+    mod equality {
+        use super::super::*;
+        #[test]
+        fn simple_equality() {
+            assert_eq!(
+                Expression::Binary {
+                    left: Box::new(Expression::Nil),
+                    operator: BinaryOperator::NotEqual,
+                    right: Box::new(Expression::Nil)
+                },
+                parse_str_with("nil !=nil", Expression::new)
+            )
+        }
+    }
+
+    /// comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+    mod comparison {
+        use super::super::*;
+        #[test]
+        fn simple_comparison() {
+            assert_eq!(
+                Expression::Binary {
+                    left: Box::new(Expression::Nil),
+                    operator: BinaryOperator::GreaterEqual,
+                    right: Box::new(Expression::Nil)
+                },
+                parse_str_with("nil >= nil", Expression::new)
+            )
+        }
+    }
+
+    /// term           → factor ( ( "-" | "+" ) factor )* ;
+    mod term {
+        use super::super::*;
+        #[test]
+        fn simple_term() {
+            assert_eq!(
+                Expression::Binary {
+                    left: Box::new(Expression::Number(1.0)),
+                    operator: BinaryOperator::Plus,
+                    right: Box::new(Expression::Binary {
+                        left: Box::new(Expression::Number(3.0)),
+                        operator: BinaryOperator::Mul,
+                        right: Box::new(Expression::Nil)
+                    })
+                },
+                parse_str_with("1 + 3 * nil", Expression::new)
+            )
+        }
+    }
+
+    /// factor         → unary ( ( "/" | "*" ) unary )* ;
+    mod factor {
+        use super::super::*;
+        #[test]
+        fn simple_factor() {
+            assert_eq!(
+                Expression::Binary {
+                    left: Box::new(Expression::Binary {
+                        left: Box::new(Expression::Number(1.0)),
+                        operator: BinaryOperator::Div,
+                        right: Box::new(Expression::Number(3.0))
+                    }),
+                    operator: BinaryOperator::Mul,
+                    right: Box::new(Expression::Nil)
+                },
+                parse_str_with("1 / 3 * nil", Expression::new)
+            )
+        }
+    }
+
+    /// unary          → ( "!" | "-" ) unary | call ;
+    mod unary {
+        use super::super::*;
+        #[test]
+        fn negated_string_literal() {
+            assert_eq!(
+                Expression::Unary {
+                    operator: UnaryOperator::Neg,
+                    right: Box::new(Expression::Unary {
+                        operator: UnaryOperator::Not,
+                        right: Box::new(Expression::Unary {
+                            operator: UnaryOperator::Neg,
+                            right: Box::new(Expression::Unary {
+                                operator: UnaryOperator::Neg,
+                                right: Box::new(Expression::Bool(false))
+                            })
+                        })
+                    })
+                },
+                parse_str_with("- ! - - false", Expression::new)
+            )
+        }
+    }
+
+    /// call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+    mod call {
+        use super::super::*;
+
+        #[test]
+        fn call_fn() {
+            assert_eq!(
+                Expression::Call {
+                    base: Box::new(Expression::Number(3.0)),
+                    path: vec![MemberAccess::Args {
+                        args: vec![Expression::Number(4.0)]
+                    }]
+                },
+                parse_str_with("3(4)", Expression::new)
+            );
+        }
+
+        #[test]
+        fn member_access() {
+            assert_eq!(
+                Expression::Call {
+                    base: Box::new(Expression::Identifier("alpha".into())),
+                    path: vec![MemberAccess::Field("alice".into())]
+                },
+                parse_str_with("alpha.alice", Expression::call)
+            );
+        }
+
+        #[test]
+        fn mix() {
+            assert_eq!(
+                Expression::Call {
+                    base: Box::new(Expression::Identifier("alpha".into())),
+                    path: vec![
+                        MemberAccess::Args { args: vec![] },
+                        MemberAccess::Args {
+                            args: vec![Expression::Number(3.0)]
+                        },
+                        MemberAccess::Field("omega".into())
+                    ]
+                },
+                parse_str_with("alpha()(3).omega", Expression::new)
+            );
+        }
+    }
+
+    /// Cover tests of "primary" lox epressions
+    /// primary        → "true" | "false" | "nil" | "this"
+    ///                | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+    ///                | "super" "." IDENTIFIER ;
+    mod primary {
+        use super::super::*;
+
+        #[test]
+        fn bool() {
+            assert_eq!(
+                Expression::Bool(false),
+                parse_str_with("false", Expression::new)
+            );
+
+            assert_eq!(
+                Expression::Bool(true),
+                parse_str_with("true", Expression::new)
+            );
+        }
+
+        #[test]
+        fn string_lit() {
+            assert_eq!(
+                Expression::String("hello".into()),
+                parse_str_with("\"hello\"", Expression::new)
+            );
+        }
+
+        #[test]
+        fn identifier() {
+            assert_eq!(
+                Expression::Identifier("atticus".into()),
+                parse_str_with("atticus", Expression::new)
+            );
+        }
+
+        #[test]
+        fn nil() {
+            assert_eq!(Expression::Nil, parse_str_with("nil", Expression::new));
+        }
+
+        #[test]
+        fn this() {
+            assert_eq!(Expression::This, parse_str_with("this", Expression::new));
+        }
+
+        #[test]
+        fn parens() {
+            assert_eq!(Expression::This, parse_str_with("(this)", Expression::new));
+        }
+
+        #[test]
+        fn super_access() {
+            assert_eq!(
+                Expression::SuperFieldAccess {
+                    field: "dot".into()
+                },
+                parse_str_with("super.dot", Expression::new)
+            );
+        }
+    }
 }
 
 #[test]
