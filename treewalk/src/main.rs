@@ -109,6 +109,7 @@ macro_rules! grammar_rule {
         fn $functionname<'a>(
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+            let desc = format!("{}::{}",std::any::type_name::<Self>(),stringify!($functionname));
             let res = grammar_rule!(@munch tokens $($tail)*);
             match res {
                 Ok((body,tokens))=>{
@@ -282,13 +283,13 @@ macro_rules! grammar_rule {
 
     // OPTIONAL GROUP ( a b )?
    (@munch $tokens:ident ($($subtree:tt)+)? $($tail:tt)*) => {{
-    // println!("optional group");
+    println!("optional group");
     let tokens = $tokens;
     let subtree = grammar_rule!(@munch tokens $($subtree)+);
     match subtree {
     Ok((parsed_subtree_ast,leftover_tokens))=>{
         // println!("optional group: {} valid",stringify!($($subtree)+));
-        //consume tokens for subtree
+        // consume tokens for subtree
         let res = grammar_rule!(@munch leftover_tokens $($tail)*);
         match res {
             Ok((parsed_tail_ast,tokens))=>Ok(((parsed_tail_ast.prep(Some(parsed_subtree_ast.done()))),tokens)),
@@ -656,8 +657,9 @@ enum MemberAccess {
 }
 
 impl MemberAccess {
+    grammar_rule!(new -> ([MemberAccess::field_name] | [MemberAccess::function_name]));
     grammar_rule!(Self::build_function_name : function_name ->  LEFT_PAREN ([Expression::new] ( COMMA [Expression::new] )* )? RIGHT_PAREN);
-    grammar_rule!(Self::build_field_name : field_name -> DOT IDENTIFIER);
+    grammar_rule!(Self::build_field_name : field_name -> IDENTIFIER);
     fn build_function_name(data: Option<(Expression, Vec<Expression>)>) -> Self {
         let args = data.map_or(Vec::new(), |(first, mut rest)| {
             rest.insert(0, first);
@@ -673,7 +675,37 @@ impl MemberAccess {
 impl Expression {
     grammar_rule!(new -> [Expression::assignment] );
     grammar_rule!(assignment -> ([Expression::member_assign] | [Expression::logic_or] ));
-    grammar_rule!(Self::build_member_assign : member_assign -> ([Expression::call] DOT)? IDENTIFIER EQUAL [Expression::assignment]);
+    fn member_assign<'a>(
+        mut tokens: &'a [Token<'a>],
+    ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
+        let mut member_accesses = vec![];
+        loop {
+            match MemberAccess::new(tokens) {
+                Ok((member_access, leftovers)) => match leftovers.get(0) {
+                    Some(t) => {
+                        if t.token == TokenType::DOT {
+                            member_accesses.push(member_access);
+                            tokens = &leftovers[1..];
+                        } else {
+                            //last one
+                            //is it an identifier
+                            match Expression::direct_assign(tokens) {
+                                Ok((direct, leftovers)) => {
+                                    //construct full assignment
+                                    todo!()
+                                }
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    }
+                    None => return Err(LoxSyntaxError::UnexpectedEof),
+                },
+                Err(e) => return Err(e),
+            }
+        }
+    }
+    grammar_rule!(Self::build_direct_assign : direct_assign -> IDENTIFIER EQUAL [Expression::assignment]); //private helper function that does not product Expression
+    grammar_rule!(call_dot -> [Expression::call] DOT);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
     grammar_rule!(Self::build_equality : equality -> [Expression::comparison] ( ( {BANG_EQUAL} | {EQUAL_EQUAL} ) [Expression::comparison] )* );
@@ -683,7 +715,7 @@ impl Expression {
     grammar_rule!(unary -> ( [Expression::recursive_unary] | [Expression::call]));
     grammar_rule!(Self::build_recursive_unary : recursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
     grammar_rule!(Self::build_call :
-        call -> [Expression::primary] ( ([MemberAccess::field_name] | [MemberAccess::function_name]) )* );
+        call -> [Expression::primary] ( [MemberAccess::new] )* );
     grammar_rule!(primary ->
         ({TRUE:Expression::Bool(true)} |
          {FALSE:Expression::Bool(false)} |
@@ -844,6 +876,13 @@ impl Expression {
     fn build_super_field_access(ident: &str) -> Self {
         Self::SuperFieldAccess {
             field: ident.to_string(),
+        }
+    }
+    fn build_direct_assign((ident, value): (&str, Expression)) -> Self {
+        let target = Expression::Identifier(ident.to_string());
+        Self::MemberAssign {
+            target: Box::new(target),
+            value: Box::new(value),
         }
     }
 }
@@ -1918,5 +1957,22 @@ fn test_parse_demo() {
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Program::new(&tokens);
+    println!("{:#?}", x);
+}
+
+#[test]
+fn test_parse_member_assign() {
+    let x = parse_str_with("x.y = 5", Expression::member_assign);
+    assert_eq!(x, Expression::Number(3.0),);
+}
+
+#[test]
+fn test_parse_assign_const() {
+    let sample = "
+6=5
+    ";
+    let scanner = Scanner::new(sample);
+    let tokens = scanner.collect::<Vec<_>>();
+    let x = Expression::new(&tokens);
     println!("{:#?}", x);
 }
