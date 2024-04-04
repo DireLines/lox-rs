@@ -471,7 +471,8 @@ enum Expression {
         right: Box<Expression>,
     },
     MemberAssign {
-        target: Box<Expression>,
+        path: Vec<MemberAccess>,
+        field: String,
         value: Box<Expression>,
     },
     Call {
@@ -523,6 +524,22 @@ enum Statement {
     },
     VarDecl(Declaration),
     EmptyStmt,
+}
+
+//needed because for member assignment we need the pre-AST parsed version of a direct assignment
+struct DirectAssignComponents {
+    identifier: String,
+    value: Expression,
+}
+
+impl DirectAssignComponents {
+    grammar_rule!(Self::build_direct_assign : direct_assign -> IDENTIFIER EQUAL [Expression::assignment]);
+    fn build_direct_assign((ident, value): (&str, Expression)) -> Self {
+        Self {
+            identifier: ident.to_string(),
+            value,
+        }
+    }
 }
 
 impl Statement {
@@ -689,10 +706,19 @@ impl Expression {
                         } else {
                             //last one
                             //is it an identifier
-                            match Expression::direct_assign(tokens) {
+                            match DirectAssignComponents::direct_assign(tokens) {
                                 Ok((direct, leftovers)) => {
                                     //construct full assignment
-                                    todo!()
+                                    //construct full target out of member_accesses + ident
+                                    //pack into Expression
+                                    return Ok((
+                                        Self::build_member_assign((
+                                            member_accesses,
+                                            &direct.identifier,
+                                            direct.value,
+                                        )),
+                                        leftovers,
+                                    ));
                                 }
                                 Err(e) => return Err(e),
                             }
@@ -704,7 +730,6 @@ impl Expression {
             }
         }
     }
-    grammar_rule!(Self::build_direct_assign : direct_assign -> IDENTIFIER EQUAL [Expression::assignment]); //private helper function that does not product Expression
     grammar_rule!(call_dot -> [Expression::call] DOT);
     grammar_rule!(Self::build_logic_or : logic_or -> [Expression::logic_and] ( OR [Expression::logic_and] )* );
     grammar_rule!(Self::build_logic_and : logic_and -> [Expression::equality] ( AND [Expression::equality] )* );
@@ -715,7 +740,7 @@ impl Expression {
     grammar_rule!(unary -> ( [Expression::recursive_unary] | [Expression::call]));
     grammar_rule!(Self::build_recursive_unary : recursive_unary -> ( {BANG} | {MINUS} ) [Expression::unary]);
     grammar_rule!(Self::build_call :
-        call -> [Expression::primary] ( [MemberAccess::new] )* );
+        call -> [Expression::primary] ( ([MemberAccess::function_name] | (DOT [MemberAccess::field_name])) )* );
     grammar_rule!(primary ->
         ({TRUE:Expression::Bool(true)} |
          {FALSE:Expression::Bool(false)} |
@@ -795,15 +820,20 @@ impl Expression {
         result
     }
 
-    fn build_member_assign((call, ident, value): (Option<Expression>, &str, Expression)) -> Self {
-        if let Some(member) = call {
-            Self::MemberAssign {
-                target: Box::new(member),
-                value: Box::new(value),
-            }
-        } else {
-            todo!()
+    fn build_member_assign((path, ident, value): (Vec<MemberAccess>, &str, Expression)) -> Self {
+        Self::MemberAssign {
+            path,
+            field: ident.to_string(),
+            value: Box::new(value),
         }
+        // if let Some(member) = call {
+        //     Self::MemberAssign {
+        //         target: Box::new(member),
+        //         value: Box::new(value),
+        //     }
+        // } else {
+        //     todo!()
+        // }
     }
     fn build_term((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
         let token_type_to_op = |tt: TokenType| {
@@ -876,13 +906,6 @@ impl Expression {
     fn build_super_field_access(ident: &str) -> Self {
         Self::SuperFieldAccess {
             field: ident.to_string(),
-        }
-    }
-    fn build_direct_assign((ident, value): (&str, Expression)) -> Self {
-        let target = Expression::Identifier(ident.to_string());
-        Self::MemberAssign {
-            target: Box::new(target),
-            value: Box::new(value),
         }
     }
 }
@@ -1262,7 +1285,8 @@ mod tests_expr {
         fn simple_assignment() {
             assert_eq!(
                 Expression::MemberAssign {
-                    target: Box::new(Expression::Identifier("time".into())),
+                    path: vec![],
+                    field: "time".to_string(),
                     value: Box::new(Expression::Identifier("money".into()))
                 },
                 parse_str_with("time = money", Expression::new)
@@ -1963,7 +1987,14 @@ fn test_parse_demo() {
 #[test]
 fn test_parse_member_assign() {
     let x = parse_str_with("x.y = 5", Expression::member_assign);
-    assert_eq!(x, Expression::Number(3.0),);
+    assert_eq!(
+        x,
+        Expression::MemberAssign {
+            path: vec![MemberAccess::Field("x".to_owned())],
+            field: "y".to_owned(),
+            value: Box::new(Expression::Number(5.0))
+        },
+    );
 }
 
 #[test]
