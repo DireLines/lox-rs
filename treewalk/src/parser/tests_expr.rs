@@ -1,4 +1,6 @@
 use super::*;
+use crate::parser::Expression;
+
 // expression     → assignment ;
 //
 // assignment     → ( call "." )? IDENTIFIER "=" assignment
@@ -312,7 +314,7 @@ fn test_parse_binary_assoc() {
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::new(&tokens);
-    use crate::Expression::*;
+    use Expression::*;
     assert_eq!(
         x.unwrap().0,
         Binary {

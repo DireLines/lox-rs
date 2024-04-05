@@ -2,4 +2,3 @@
 mod parser;
 mod scanner;
 pub use parser::run;
-use parser::Expression;
