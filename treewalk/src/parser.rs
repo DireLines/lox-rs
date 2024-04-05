@@ -819,14 +819,6 @@ impl Expression {
             field: ident.to_string(),
             value: Box::new(value),
         }
-        // if let Some(member) = call {
-        //     Self::MemberAssign {
-        //         target: Box::new(member),
-        //         value: Box::new(value),
-        //     }
-        // } else {
-        //     todo!()
-        // }
     }
     fn build_term((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {
         let token_type_to_op = |tt: TokenType| {
