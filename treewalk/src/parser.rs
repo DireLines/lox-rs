@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use crate::scanner::{Scanner, Token, TokenType};
 
 /// Prepend a new item to a Heterogenous collection
