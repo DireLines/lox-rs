@@ -105,15 +105,12 @@ macro_rules! grammar_rule {
         fn $functionname<'a>(
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
-            let desc = format!("{}::{}",std::any::type_name::<Self>(),stringify!($functionname));
             let res = grammar_rule!(@munch tokens $($tail)*);
             match res {
                 Ok((body,tokens))=>{
-                    // println!("{desc} ok");
                     Ok(($ast_build_fn(body.done()),tokens))
                 },
                 Err(e)=>{
-                    // println!("{desc} not ok");
                     Err(e)
                 }
             }
@@ -648,7 +645,7 @@ impl Declaration {
     }
 }
 #[derive(Debug, PartialEq, Clone)]
-enum MemberAccess {
+pub enum MemberAccess {
     Field(String),
     Args { args: Vec<Expression> },
 }
@@ -907,13 +904,13 @@ impl Expression {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum UnaryOperator {
+pub enum UnaryOperator {
     Neg,
     Not,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum BinaryOperator {
+pub enum BinaryOperator {
     Minus,
     Plus,
     Div,
