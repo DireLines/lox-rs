@@ -10,7 +10,7 @@ enum Value {
     Nil,
 }
 
-fn binary_op_evaluator(op: BinaryOperator) -> impl Fn(Expression, Expression) -> Result<Value> {
+fn binary_op_evaluator(op: BinaryOperator) -> fn(Expression, Expression) -> Result<Value> {
     match op {
         BinaryOperator::Plus => todo!(),
         BinaryOperator::Minus => todo!(),
@@ -28,15 +28,15 @@ fn binary_op_evaluator(op: BinaryOperator) -> impl Fn(Expression, Expression) ->
     }
 }
 
-fn pair_of_numbers(a: Value, b: Value) -> Option<(f64, f64)> {
+fn pair_of_numbers(a: &Value, b: &Value) -> Option<(f64, f64)> {
     match (a, b) {
-        (Value::Number(a), Value::Number(b)) => Some((a, b)),
+        (Value::Number(a), Value::Number(b)) => Some((*a, *b)),
         _ => None,
     }
 }
-fn pair_of_strings(a: Value, b: Value) -> Option<(String, String)> {
+fn pair_of_strings(a: &Value, b: &Value) -> Option<(String, String)> {
     match (a, b) {
-        (Value::String(a), Value::String(b)) => Some((a, b)),
+        (Value::String(a), Value::String(b)) => Some((a.to_owned(), b.to_owned())),
         _ => None,
     }
 }
@@ -59,9 +59,9 @@ fn eval(expr: Expression, state: ()) -> Value {
             match operator {
                 BinaryOperator::Minus => todo!(),
                 BinaryOperator::Plus => {
-                    if let Some((left, right)) = pair_of_numbers(left, right) {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Number(left + right);
-                    } else if let Some((left, right)) = pair_of_strings(left, right) {
+                    } else if let Some((left, right)) = pair_of_strings(&left, &right) {
                         return Value::String(left + &right);
                     }
                     panic!("Operands must be two numbers or two strings.")

@@ -414,7 +414,7 @@ impl Program {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum LoxSyntaxError<'a> {
+pub enum LoxSyntaxError<'a> {
     UnexpectedEof,
     UnexpectedToken {
         lexeme: &'a str,
