@@ -340,7 +340,8 @@ fn test_syntax_error_unexpected() {
         Err(LoxSyntaxError::UnexpectedToken {
             lexeme: "/",
             line: 0,
-            message: "Unexpected token"
+            message: "Unexpected token",
+            num_unparsed_tokens: 1,
         })
     );
 }
@@ -356,25 +357,19 @@ fn test_syntax_error_unexpected_paren() {
         Err(LoxSyntaxError::UnexpectedToken {
             lexeme: ")",
             line: 0,
-            message: "Unexpected token"
+            message: "Unexpected token",
+            num_unparsed_tokens: 1,
         })
     );
 }
 
 #[test]
 fn test_syntax_error_missing_paren() {
-    let sample = "(1 2";
+    let sample = "(1";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
     let x = Expression::new(&tokens);
-    assert_eq!(
-        x,
-        Err(LoxSyntaxError::UnexpectedToken {
-            lexeme: "2",
-            line: 0,
-            message: "Unexpected token"
-        })
-    );
+    assert_eq!(x, Err(LoxSyntaxError::UnexpectedEof));
 }
 
 #[test]

@@ -140,6 +140,7 @@ macro_rules! grammar_rule {
                     lexeme: first_token.lexeme,
                     line: first_token.line,
                     message: "Unexpected token",
+                                        num_unparsed_tokens:$tokens.len(),
                 })
                 }
             }
@@ -166,7 +167,8 @@ macro_rules! grammar_rule {
                         lexeme: first_token.lexeme,
                         line: first_token.line,
                         message: "Unexpected token",
-                })
+                        num_unparsed_tokens:$tokens.len(),
+                    })
             }
             }
         },
@@ -192,6 +194,7 @@ macro_rules! grammar_rule {
                         lexeme: first_token.lexeme,
                         line: first_token.line,
                         message: "Unexpected token",
+                        num_unparsed_tokens:$tokens.len(),
                 })
             }
             }
@@ -228,7 +231,8 @@ macro_rules! grammar_rule {
     //OR GROUP ( a | b | c )
     (@munch $tokens:ident ($first:tt | $($variants:tt)|*) $($tail:tt)*) => {{
         let tokens = $tokens;
-        let subtree = grammar_rule!(@orgroup tokens $first | $($variants)|*);
+        let mut best_error = (0,LoxSyntaxError::UnexpectedEof);
+        let subtree = grammar_rule!(@orgroup best_error tokens $first | $($variants)|*);
         match subtree {
             Ok((parsed_subtree_ast,leftover_tokens))=>{
                 //consume tokens for subtree
@@ -239,26 +243,32 @@ macro_rules! grammar_rule {
                 }
             },
             Err(e)=>{
-                //TODO: did not match any of the acceptable variants
-                Err(e)
+                Err(best_error.1)
             }
         }
         }};
 
     // this handles continuation in or group
-    (@orgroup $tokens:ident $first_variant:tt | $($remaining_variants:tt)|*) => {{
+    (@orgroup $best_error:ident $tokens:ident $first_variant:tt | $($remaining_variants:tt)|*) => {{
         let tokens = $tokens;
         let subtree = grammar_rule!(@munch tokens $first_variant);
         match subtree {
             Ok(_)=>{
                 subtree
             },
-            Err(_)=>{
-                grammar_rule!(@orgroup tokens $($remaining_variants)|*)
+            Err(e)=>{
+                let num_tokens_matched = $tokens.len() - match e {
+                    LoxSyntaxError::UnexpectedEof => 0,
+                    LoxSyntaxError::UnexpectedToken {num_unparsed_tokens,.. } => num_unparsed_tokens,
+                };
+                if num_tokens_matched > $best_error.0 {
+                    $best_error = (num_tokens_matched, e);
+                }
+                grammar_rule!(@orgroup $best_error tokens $($remaining_variants)|*)
             }
         }
     }};
-    (@orgroup $tokens:ident $first_variant:tt) => {{
+    (@orgroup $best_error:ident $tokens:ident $first_variant:tt) => {{
         grammar_rule!(@munch $tokens $first_variant)
     }};
 
@@ -326,6 +336,7 @@ macro_rules! grammar_rule {
                         lexeme: first_token.lexeme,
                         line: first_token.line,
                         message: "Unexpected token",
+                        num_unparsed_tokens:$tokens.len(),
                 })
             }
         },
@@ -351,6 +362,7 @@ macro_rules! grammar_rule {
                         lexeme: first_token.lexeme,
                         line: first_token.line,
                         message: "Unexpected token",
+                        num_unparsed_tokens:$tokens.len(),
                 })
             }
         },
@@ -370,6 +382,7 @@ macro_rules! grammar_rule {
                         lexeme: first_token.lexeme,
                         line: first_token.line,
                         message: "Unexpected token",
+                        num_unparsed_tokens:$tokens.len(),
                 })
             }
         },
@@ -420,6 +433,7 @@ enum LoxSyntaxError<'a> {
         lexeme: &'a str,
         line: usize,
         message: &'static str,
+        num_unparsed_tokens: usize,
     },
 }
 #[derive(Debug, PartialEq, Clone)]
