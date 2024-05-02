@@ -102,7 +102,7 @@ macro_rules! grammar_rule {
     //
     // Function generated in this entry point transforms the result before returning it
     ($ast_build_fn:path : $functionname:ident -> $($tail:tt)*) => {
-        fn $functionname<'a>(
+        pub fn $functionname<'a>(
             tokens: &'a [Token<'a>],
         ) -> std::result::Result<(Self, &[Token<'a>]), LoxSyntaxError> {
             let res = grammar_rule!(@munch tokens $($tail)*);
@@ -907,7 +907,7 @@ pub fn run(source: &str) {
 ///
 /// Assumes parser should not produce any leftovers
 #[cfg(test)]
-fn parse_str_with<F, T>(input: &str, parser: F) -> T
+pub(crate) fn parse_str_with<F, T>(input: &str, parser: F) -> T
 where
     F: for<'a> Fn(&'a [Token<'a>]) -> std::result::Result<(T, &'a [Token<'a>]), LoxSyntaxError<'a>>,
     T: std::fmt::Debug,
