@@ -10,24 +10,22 @@ enum Value {
     Nil,
 }
 
-fn binary_op_evaluator(op: BinaryOperator) -> fn(Expression, Expression) -> Result<Value> {
-    match op {
-        BinaryOperator::Plus => todo!(),
-        BinaryOperator::Minus => todo!(),
-        BinaryOperator::Div => todo!(),
-        BinaryOperator::Mul => todo!(),
-        BinaryOperator::Equal => todo!(),
-        BinaryOperator::EqualEqual => todo!(),
-        BinaryOperator::NotEqual => todo!(),
-        BinaryOperator::Greater => todo!(),
-        BinaryOperator::GreaterEqual => todo!(),
-        BinaryOperator::Less => todo!(),
-        BinaryOperator::LessEqual => todo!(),
-        BinaryOperator::Or => todo!(),
-        BinaryOperator::And => todo!(),
+fn truth_value(v: &Value) -> bool {
+    match v {
+        Value::Nil => false,
+        Value::Bool(b) => *b,
+        _ => true,
     }
 }
-
+fn is_equal(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => a == b,
+        (Value::String(a), Value::String(b)) => a == b,
+        (Value::Bool(a), Value::Bool(b)) => a == b,
+        (Value::Nil, Value::Nil) => true,
+        _ => false,
+    }
+}
 fn pair_of_numbers(a: &Value, b: &Value) -> Option<(f64, f64)> {
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => Some((*a, *b)),
@@ -57,7 +55,12 @@ fn eval(expr: Expression, state: ()) -> Value {
             let left = eval(*left, state);
             let right = eval(*right, state);
             match operator {
-                BinaryOperator::Minus => todo!(),
+                BinaryOperator::Minus => {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
+                        return Value::Number(left - right);
+                    }
+                    panic!("Operands must be two numbers.")
+                } //nums
                 BinaryOperator::Plus => {
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Number(left + right);
@@ -66,17 +69,47 @@ fn eval(expr: Expression, state: ()) -> Value {
                     }
                     panic!("Operands must be two numbers or two strings.")
                 }
-                BinaryOperator::Div => todo!(),
-                BinaryOperator::Mul => todo!(),
-                BinaryOperator::Equal => todo!(),
-                BinaryOperator::EqualEqual => todo!(),
-                BinaryOperator::NotEqual => todo!(),
-                BinaryOperator::Greater => todo!(),
-                BinaryOperator::GreaterEqual => todo!(),
-                BinaryOperator::Less => todo!(),
-                BinaryOperator::LessEqual => todo!(),
-                BinaryOperator::Or => todo!(),
-                BinaryOperator::And => todo!(),
+                BinaryOperator::Div => {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
+                        return Value::Number(left / right);
+                    }
+                    panic!("Operands must be two numbers.")
+                } //nums
+                BinaryOperator::Mul => {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
+                        return Value::Number(left * right);
+                    }
+                    panic!("Operands must be two numbers.")
+                } //nums
+                BinaryOperator::Equal => todo!(), //anything
+                BinaryOperator::EqualEqual => Value::Bool(is_equal(&left, &right)),
+                BinaryOperator::NotEqual => Value::Bool(!is_equal(&left, &right)),
+                BinaryOperator::Greater => {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
+                        return Value::Bool(left > right);
+                    }
+                    panic!("Operands must be two numbers.")
+                } //nums
+                BinaryOperator::GreaterEqual => {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
+                        return Value::Bool(left >= right);
+                    }
+                    panic!("Operands must be two numbers.")
+                } //nums
+                BinaryOperator::Less => {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
+                        return Value::Bool(left < right);
+                    }
+                    panic!("Operands must be two numbers.")
+                } //nums
+                BinaryOperator::LessEqual => {
+                    if let Some((left, right)) = pair_of_numbers(&left, &right) {
+                        return Value::Bool(left <= right);
+                    }
+                    panic!("Operands must be two numbers.")
+                } //nums
+                BinaryOperator::Or => Value::Bool(truth_value(&left) || truth_value(&right)),
+                BinaryOperator::And => Value::Bool(truth_value(&left) && truth_value(&right)),
             }
         }
         _ => Value::Nil,
