@@ -402,7 +402,7 @@ macro_rules! grammar_rule {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct Program {
+pub struct Program {
     body: Vec<Declaration>,
 }
 
@@ -457,7 +457,7 @@ pub enum Expression {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum Declaration {
+pub enum Declaration {
     ClassDecl {
         name: String,
         parent_name: Option<String>,
@@ -472,7 +472,7 @@ enum Declaration {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum Statement {
+pub enum Statement {
     ExprStmt(Expression),
     ForStmt {
         stmt: Box<Statement>,
@@ -564,7 +564,7 @@ impl Statement {
     }
 }
 #[derive(Debug, PartialEq, Clone)]
-struct Function {
+pub struct Function {
     name: String,
     parameters: Vec<String>,
     body: Box<Option<Statement>>,
