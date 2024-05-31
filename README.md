@@ -33,5 +33,5 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
     - 2024-03-14 [video](https://www.youtube.com/watch?v=O74mleTLbQw&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=14)
     - 2024-03-21 (not recorded)
     - 2024-04-04 [video](https://www.youtube.com/watch?v=LD5j4o-qg6Y&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=15)
-    
-    
+    - 2024-04-25 (not recorded)
+    - 2024-05-02 [video](https://www.youtube.com/watch?v=F6RtSRNDGB8&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=16)
