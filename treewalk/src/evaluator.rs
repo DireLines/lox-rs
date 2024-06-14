@@ -21,59 +21,60 @@ impl Display for Value {
     }
 }
 
-#[derive(Default)]
-struct Environment<'a> {
-    environment: HashMap<String, Value>,
-    enclosing: Option<&'a mut Environment<'a>>,
+type Environment = HashMap<String, Value>;
+#[derive(Debug)]
+struct EnvStack(Vec<Environment>);
+impl Default for EnvStack {
+    fn default() -> Self {
+        Self(vec![Default::default()])
+    }
 }
-impl<'a> Environment<'a> {
-    fn new(enclosing: &'a mut Environment<'a>) -> Self {
-        Self {
-            environment: HashMap::new(),
-            enclosing: Some(enclosing),
-        }
+impl EnvStack {
+    fn push_env(&mut self) {
+        self.0.push(HashMap::new())
+    }
+    fn current(&self) -> &Environment {
+        self.0.last().expect("we do not expect empty list of environments, there should always at least be global scope")
+    }
+    fn current_mut(&mut self) -> &mut Environment {
+        self.0.last_mut().expect("we do not expect empty list of environments, there should always at least be global scope")
     }
     fn define(&mut self, name: String, value: Value) {
-        self.environment.insert(name, value);
+        self.current_mut().insert(name, value);
     }
     fn declare(&mut self, name: String) {
-        self.environment.insert(name, Value::Nil);
+        self.current_mut().insert(name, Value::Nil);
     }
     fn assign(&mut self, name: String, value: Value) {
-        println!("assigning {name} to {:?}", value.clone());
-        if let Some(v) = self.environment.get_mut(&name) {
-            *v = value;
-        } else {
-            if let Some(enclosing) = &mut self.enclosing {
-                enclosing.assign(name, value);
+        for env in self.0.iter_mut().rev() {
+            if let Some(v) = env.get_mut(&name) {
+                *v = value;
                 return;
             }
-            panic!();
-            // throw new RuntimeError(name,
-            //     "Undefined variable '" + name.lexeme + "'.");
         }
+        panic!("bad assign");
+        // throw new RuntimeError(name,
+        //     "Undefined variable '" + name.lexeme + "'.");
     }
     fn get(&self, name: String) -> Option<&Value> {
-        if let Some(v) = self.environment.get(&name) {
-            Some(v)
-        } else if let Some(enclosing) = &self.enclosing {
-            enclosing.get(name)
-        } else {
-            panic!();
-            // throw new RuntimeError(name,
-            //     "Undefined variable '" + name.lexeme + "'.");
+        for env in self.0.iter().rev() {
+            if let Some(v) = env.get(&name) {
+                return Some(v);
+            }
         }
+        panic!("bad get");
+        // throw new RuntimeError(name,
+        //     "Undefined variable '" + name.lexeme + "'.");
     }
     fn get_mut(&mut self, name: String) -> Option<&mut Value> {
-        if let Some(v) = self.environment.get_mut(&name) {
-            Some(v)
-        } else if let Some(enclosing) = &mut self.enclosing {
-            enclosing.get_mut(name)
-        } else {
-            panic!();
-            // throw new RuntimeError(name,
-            //     "Undefined variable '" + name.lexeme + "'.");
+        for env in self.0.iter_mut().rev() {
+            if let Some(v) = env.get_mut(&name) {
+                return Some(v);
+            }
         }
+        panic!("bad get_mut");
+        // throw new RuntimeError(name,
+        //     "Undefined variable '" + name.lexeme + "'.");
     }
 }
 
@@ -113,7 +114,7 @@ fn evaluate(program: Program) -> Result<()> {
     Ok(())
 }
 
-fn interpret<'a, 'b>(declarations: Vec<Declaration>, state: &'a mut Environment<'a>) {
+fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
     for declaration in declarations {
         match declaration {
             Declaration::ClassDecl {
@@ -131,7 +132,7 @@ fn interpret<'a, 'b>(declarations: Vec<Declaration>, state: &'a mut Environment<
     }
 }
 
-fn interpret_statement<'a, 'b>(statement: Statement, state: &'b mut Environment<'a>) {
+fn interpret_statement(statement: Statement, state: &mut EnvStack) {
     match statement {
         Statement::ExprStmt(expr) => {
             eval_expr(expr, state);
@@ -141,9 +142,8 @@ fn interpret_statement<'a, 'b>(statement: Statement, state: &'b mut Environment<
             println!("{v}");
         }
         Statement::Block { body } => {
-            //make new scope
-            let mut inner = Environment::new(state);
-            interpret(body, &mut inner);
+            state.push_env();
+            interpret(body, state);
         }
         Statement::VarDecl(var_decl) => match var_decl {
             Declaration::VarDecl { name, definition } => {
@@ -155,7 +155,7 @@ fn interpret_statement<'a, 'b>(statement: Statement, state: &'b mut Environment<
         _ => todo!(),
     }
 }
-fn eval_expr(expr: Expression, state: &mut Environment) -> Value {
+fn eval_expr(expr: Expression, state: &mut EnvStack) -> Value {
     match expr {
         Expression::Number(n) => Value::Number(n),
         Expression::String(s) => Value::String(s),
