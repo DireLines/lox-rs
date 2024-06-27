@@ -403,7 +403,7 @@ macro_rules! grammar_rule {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Program {
-    body: Vec<Declaration>,
+    pub body: Vec<Declaration>,
 }
 
 impl Program {

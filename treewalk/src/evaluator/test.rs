@@ -54,3 +54,41 @@ fn test_eval_expr_declare_assign() {
     let result = eval_expr(use_var_ast, &mut env);
     assert!(result == Value::Bool(true));
 }
+
+#[test]
+fn test_interpret_statement_if() {
+    let program = "var a = 1; if (3 == 4) { a = 2; } else { a = 3; }";
+    let ast = parse_str_with(program, Program::new);
+    let mut env = EnvStack::default();
+    let _ = interpret(ast.body, &mut env);
+    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(3.0));
+}
+
+#[test]
+fn test_interpret_statement_while() {
+    let program = "var a = 1; while (a < 6) { a = a + 1; }";
+    let ast = parse_str_with(program, Program::new);
+    let mut env = EnvStack::default();
+    let _ = interpret(ast.body, &mut env);
+    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(6.0));
+}
+
+#[test]
+fn test_eval_expr_short_circuit_or() {
+    //c is not defined, would crash if evaluated
+    let program = "var a = 1; var b = a or c;";
+    let ast = parse_str_with(program, Program::new);
+    let mut env = EnvStack::default();
+    let _ = interpret(ast.body, &mut env);
+    assert_eq!(*env.get("b".to_string()).unwrap(), Value::Number(1.0));
+}
+
+#[test]
+fn test_eval_expr_short_circuit_and() {
+    //c is not defined, would crash if evaluated
+    let program = "var a = false; var b = a and c;";
+    let ast = parse_str_with(program, Program::new);
+    let mut env = EnvStack::default();
+    let _ = interpret(ast.body, &mut env);
+    assert_eq!(*env.get("b".to_string()).unwrap(), Value::Bool(false));
+}
