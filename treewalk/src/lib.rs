@@ -2,4 +2,5 @@
 mod evaluator;
 mod parser;
 mod scanner;
-pub use parser::run;
+pub use evaluator::{interpret, EnvStack};
+pub use parser::{parse_str_with, Program};

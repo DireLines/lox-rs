@@ -1,7 +1,7 @@
 use std::env::args;
 use std::error::Error;
 use std::io::{BufRead, Write};
-use treewalk::run;
+use treewalk::{interpret, parse_str_with, EnvStack, Program};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 fn main() -> Result<()> {
@@ -40,4 +40,10 @@ fn run_prompt() -> Result<()> {
         run(&line);
     }
     Ok(())
+}
+
+fn run(source: &str) {
+    let ast = parse_str_with(source, Program::new);
+    let mut env = EnvStack::default();
+    interpret(ast.body, &mut env);
 }

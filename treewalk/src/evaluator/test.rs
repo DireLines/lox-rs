@@ -74,6 +74,26 @@ fn test_interpret_statement_while() {
 }
 
 #[test]
+fn test_interpret_statement_for() {
+    let program = "var a = 0; for (var b = 0; b < 10; b = b + 1) { a = a + 1; }";
+    let ast = parse_str_with(program, Program::new);
+    let mut env = EnvStack::default();
+    let _ = interpret(ast.body, &mut env);
+    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(10.0));
+}
+
+#[test]
+fn test_interpret_statement_for_external_var() {
+    let program =
+        "var b = 0; var a = 0; var c = 0; for (b = 0; b < 10; b = b + 1) { a = a + 1; c = c + 1; }";
+    let ast = parse_str_with(program, Program::new);
+    let mut env = EnvStack::default();
+    let _ = interpret(ast.body, &mut env);
+    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(10.0));
+    assert_eq!(*env.get("c".to_string()).unwrap(), Value::Number(10.0));
+}
+
+#[test]
 fn test_eval_expr_short_circuit_or() {
     //c is not defined, would crash if evaluated
     let program = "var a = 1; var b = a or c;";

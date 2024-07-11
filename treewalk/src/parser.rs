@@ -892,22 +892,10 @@ pub enum BinaryOperator {
     And,
 }
 
-pub fn run(source: &str) {
-    //make a Scanner
-    let scanner = Scanner::new(source);
-    //get tokens from scanner
-    for token in scanner {
-        println!("{token:#?}");
-    }
-    //print tokens
-    println!("running on {source}");
-}
-
 /// Apply a parser directly to a string, confirm that there are no leftovers
 ///
 /// Assumes parser should not produce any leftovers
-#[cfg(test)]
-pub(crate) fn parse_str_with<F, T>(input: &str, parser: F) -> T
+pub fn parse_str_with<F, T>(input: &str, parser: F) -> T
 where
     F: for<'a> Fn(&'a [Token<'a>]) -> std::result::Result<(T, &'a [Token<'a>]), LoxSyntaxError<'a>>,
     T: std::fmt::Debug,

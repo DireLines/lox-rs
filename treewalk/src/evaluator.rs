@@ -23,7 +23,7 @@ impl Display for Value {
 
 type Environment = HashMap<String, Value>;
 #[derive(Debug)]
-struct EnvStack(Vec<Environment>);
+pub struct EnvStack(Vec<Environment>);
 impl Default for EnvStack {
     fn default() -> Self {
         Self(vec![Default::default()])
@@ -114,7 +114,7 @@ fn evaluate(program: Program) -> Result<()> {
     Ok(())
 }
 
-fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
+pub fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
     for declaration in declarations {
         match declaration {
             Declaration::ClassDecl {
@@ -150,7 +150,9 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
                 let v = eval_expr(definition.unwrap_or(Expression::Nil), state);
                 state.define(name, v);
             }
-            _ => todo!(),
+            Declaration::ClassDecl { .. } => todo!(),
+            Declaration::FunDecl(_) => todo!(),
+            Declaration::Statement(statement) => interpret_statement(*statement, state),
         },
         Statement::IfStmt {
             condition,
@@ -175,7 +177,21 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
             condition,
             increment,
             body,
-        } => {}
+        } => {
+            interpret_statement(Statement::VarDecl(Declaration::Statement(stmt)), state);
+            let mut body_decls = vec![Declaration::Statement(body)];
+            if let Some(increment) = *increment {
+                body_decls.push(Declaration::Statement(Box::new(Statement::ExprStmt(
+                    increment,
+                ))));
+            }
+            let condition = condition.unwrap_or(Expression::Bool(true));
+            let while_stmt = Statement::WhileStmt {
+                condition: Box::new(condition),
+                body: Box::new(Statement::Block { body: body_decls }),
+            };
+            interpret_statement(while_stmt, state);
+        }
         _ => todo!(),
     }
 }
