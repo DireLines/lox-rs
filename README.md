@@ -37,3 +37,8 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
     - 2024-05-02 [video](https://www.youtube.com/watch?v=F6RtSRNDGB8&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=16)
     - 2024-05-16 [video](https://www.youtube.com/watch?v=O8iMDXLDhf0&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=17)
     - 2024-05-30 [video](https://www.youtube.com/watch?v=z87-GsUQB7E&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=18)
+    - 2024-06-13 [video](https://www.youtube.com/watch?v=aU5iJLKjfyU&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=19)
+9. [Control Flow](https://craftinginterpreters.com/control-flow.html)
+    - 2024-06-27 [video](https://www.youtube.com/watch?v=tjFfXSbDVSg&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=20)
+    
+
