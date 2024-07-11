@@ -7,7 +7,7 @@ fn test_eval_expr_mismatch_types() {
     let sample = "3 == \"3\"";
     let x = parse_str_with(sample, Expression::new);
     let mut env = EnvStack::default();
-    let result = eval_expr(x, &mut env);
+    let result = eval_expr(&x, &mut env);
     assert!(result == Value::Bool(false));
 }
 
@@ -16,7 +16,7 @@ fn test_eval_expr_trivial() {
     let sample = "3 == 3";
     let x = parse_str_with(sample, Expression::new);
     let mut env = EnvStack::default();
-    let result = eval_expr(x, &mut env);
+    let result = eval_expr(&x, &mut env);
     assert!(result == Value::Bool(true));
 }
 
@@ -25,7 +25,7 @@ fn test_eval_expr_nums() {
     let sample = "3 == (5+5)*(3-4)";
     let x = parse_str_with(sample, Expression::new);
     let mut env = EnvStack::default();
-    let result = eval_expr(x, &mut env);
+    let result = eval_expr(&x, &mut env);
     assert!(result == Value::Bool(false));
 }
 
@@ -37,7 +37,7 @@ fn test_eval_expr_declare() {
     let use_var_ast = parse_str_with(use_var, Expression::new);
     let mut env = EnvStack::default();
     let _ = interpret(vec![declare_ast], &mut env);
-    let result = eval_expr(use_var_ast, &mut env);
+    let result = eval_expr(&use_var_ast, &mut env);
     assert!(result == Value::Bool(true));
 }
 
@@ -51,7 +51,7 @@ fn test_eval_expr_declare_assign() {
     let use_var_ast = parse_str_with(use_var, Expression::new);
     let mut env = EnvStack::default();
     let _ = interpret(vec![declare_ast, assign_ast], &mut env);
-    let result = eval_expr(use_var_ast, &mut env);
+    let result = eval_expr(&use_var_ast, &mut env);
     assert!(result == Value::Bool(true));
 }
 
@@ -61,7 +61,7 @@ fn test_interpret_statement_if() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(ast.body, &mut env);
-    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(3.0));
+    assert_eq!(*env.get("a").unwrap(), Value::Number(3.0));
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn test_interpret_statement_while() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(ast.body, &mut env);
-    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(6.0));
+    assert_eq!(*env.get("a").unwrap(), Value::Number(6.0));
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn test_interpret_statement_for() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(ast.body, &mut env);
-    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(10.0));
+    assert_eq!(*env.get("a").unwrap(), Value::Number(10.0));
 }
 
 #[test]
@@ -89,8 +89,8 @@ fn test_interpret_statement_for_external_var() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(ast.body, &mut env);
-    assert_eq!(*env.get("a".to_string()).unwrap(), Value::Number(10.0));
-    assert_eq!(*env.get("c".to_string()).unwrap(), Value::Number(10.0));
+    assert_eq!(*env.get("a").unwrap(), Value::Number(10.0));
+    assert_eq!(*env.get("c").unwrap(), Value::Number(10.0));
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn test_eval_expr_short_circuit_or() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(ast.body, &mut env);
-    assert_eq!(*env.get("b".to_string()).unwrap(), Value::Number(1.0));
+    assert_eq!(*env.get("b").unwrap(), Value::Number(1.0));
 }
 
 #[test]
@@ -110,5 +110,5 @@ fn test_eval_expr_short_circuit_and() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(ast.body, &mut env);
-    assert_eq!(*env.get("b".to_string()).unwrap(), Value::Bool(false));
+    assert_eq!(*env.get("b").unwrap(), Value::Bool(false));
 }

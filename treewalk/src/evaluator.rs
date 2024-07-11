@@ -39,15 +39,15 @@ impl EnvStack {
     fn current_mut(&mut self) -> &mut Environment {
         self.0.last_mut().expect("we do not expect empty list of environments, there should always at least be global scope")
     }
-    fn define(&mut self, name: String, value: Value) {
-        self.current_mut().insert(name, value);
+    fn define(&mut self, name: &str, value: Value) {
+        self.current_mut().insert(name.to_string(), value);
     }
-    fn declare(&mut self, name: String) {
-        self.current_mut().insert(name, Value::Nil);
+    fn declare(&mut self, name: &str) {
+        self.current_mut().insert(name.to_string(), Value::Nil);
     }
-    fn assign(&mut self, name: String, value: Value) {
+    fn assign(&mut self, name: &str, value: Value) {
         for env in self.0.iter_mut().rev() {
-            if let Some(v) = env.get_mut(&name) {
+            if let Some(v) = env.get_mut(name) {
                 *v = value;
                 return;
             }
@@ -56,9 +56,9 @@ impl EnvStack {
         // throw new RuntimeError(name,
         //     "Undefined variable '" + name.lexeme + "'.");
     }
-    fn get(&self, name: String) -> Option<&Value> {
+    fn get(&self, name: &str) -> Option<&Value> {
         for env in self.0.iter().rev() {
-            if let Some(v) = env.get(&name) {
+            if let Some(v) = env.get(name) {
                 return Some(v);
             }
         }
@@ -66,9 +66,9 @@ impl EnvStack {
         // throw new RuntimeError(name,
         //     "Undefined variable '" + name.lexeme + "'.");
     }
-    fn get_mut(&mut self, name: String) -> Option<&mut Value> {
+    fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
         for env in self.0.iter_mut().rev() {
-            if let Some(v) = env.get_mut(&name) {
+            if let Some(v) = env.get_mut(name) {
                 return Some(v);
             }
         }
@@ -124,8 +124,8 @@ pub fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
             } => todo!(),
             Declaration::FunDecl(_) => todo!(),
             Declaration::VarDecl { name, definition } => {
-                let v = eval_expr(definition.unwrap_or(Expression::Nil), state);
-                state.define(name, v);
+                let v = eval_expr(&definition.unwrap_or(Expression::Nil), state);
+                state.define(&name, v);
             }
             Declaration::Statement(statement) => interpret_statement(*statement, state),
         }
@@ -135,10 +135,10 @@ pub fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
 fn interpret_statement(statement: Statement, state: &mut EnvStack) {
     match statement {
         Statement::ExprStmt(expr) => {
-            eval_expr(expr, state);
+            eval_expr(&expr, state);
         }
         Statement::PrintStmt(expr) => {
-            let v = eval_expr(expr, state);
+            let v = eval_expr(&expr, state);
             println!("{v}");
         }
         Statement::Block { body } => {
@@ -147,8 +147,8 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
         }
         Statement::VarDecl(var_decl) => match var_decl {
             Declaration::VarDecl { name, definition } => {
-                let v = eval_expr(definition.unwrap_or(Expression::Nil), state);
-                state.define(name, v);
+                let v = eval_expr(&definition.unwrap_or(Expression::Nil), state);
+                state.define(&name, v);
             }
             Declaration::ClassDecl { .. } => todo!(),
             Declaration::FunDecl(_) => todo!(),
@@ -159,7 +159,7 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
             if_case,
             else_case,
         } => {
-            let cond = eval_expr(*condition, state);
+            let cond = eval_expr(&condition, state);
             if truth_value(&cond) {
                 interpret_statement(*if_case, state);
             } else if let Some(else_case) = *else_case {
@@ -168,7 +168,7 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
         }
         Statement::WhileStmt { condition, body } => {
             //TODO: maybe eval_expr doesn't need to consume the expression?
-            while (truth_value(&eval_expr(*condition.clone(), state))) {
+            while (truth_value(&eval_expr(&condition, state))) {
                 interpret_statement(*body.clone(), state);
             }
         }
@@ -195,17 +195,17 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
         _ => todo!(),
     }
 }
-fn eval_expr(expr: Expression, state: &mut EnvStack) -> Value {
+fn eval_expr(expr: &Expression, state: &mut EnvStack) -> Value {
     match expr {
-        Expression::Number(n) => Value::Number(n),
-        Expression::String(s) => Value::String(s),
+        Expression::Number(n) => Value::Number(*n),
+        Expression::String(s) => Value::String(s.to_string()),
         Expression::Identifier(name) => state.get(name).expect("variable not defined").clone(),
-        Expression::Bool(b) => Value::Bool(b),
+        Expression::Bool(b) => Value::Bool(*b),
         Expression::Nil => Value::Nil,
         Expression::This => panic!("need to know how classes work"),
-        Expression::Grouping { expression } => eval_expr(*expression, state),
+        Expression::Grouping { expression } => eval_expr(expression, state),
         Expression::Unary { operator, right } => {
-            let right = eval_expr(*right, state);
+            let right = eval_expr(right, state);
             match operator {
                 UnaryOperator::Neg => match right {
                     Value::Number(n) => Value::Number(-n),
@@ -219,17 +219,17 @@ fn eval_expr(expr: Expression, state: &mut EnvStack) -> Value {
             operator,
             right,
         } => {
-            let left = eval_expr(*left, state);
+            let left = eval_expr(left, state);
             match operator {
                 BinaryOperator::Minus => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Number(left - right);
                     }
                     panic!("Operands must be two numbers.")
                 }
                 BinaryOperator::Plus => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Number(left + right);
                     } else if let Some((left, right)) = pair_of_strings(&left, &right) {
@@ -238,14 +238,14 @@ fn eval_expr(expr: Expression, state: &mut EnvStack) -> Value {
                     panic!("Operands must be two numbers or two strings.")
                 }
                 BinaryOperator::Div => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Number(left / right);
                     }
                     panic!("Operands must be two numbers.")
                 }
                 BinaryOperator::Mul => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Number(left * right);
                     }
@@ -253,36 +253,36 @@ fn eval_expr(expr: Expression, state: &mut EnvStack) -> Value {
                 }
                 BinaryOperator::Equal => todo!(), //anything
                 BinaryOperator::EqualEqual => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     Value::Bool(is_equal(&left, &right))
                 }
                 BinaryOperator::NotEqual => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     Value::Bool(!is_equal(&left, &right))
                 }
                 BinaryOperator::Greater => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Bool(left > right);
                     }
                     panic!("Operands must be two numbers.")
                 }
                 BinaryOperator::GreaterEqual => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Bool(left >= right);
                     }
                     panic!("Operands must be two numbers.")
                 }
                 BinaryOperator::Less => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Bool(left < right);
                     }
                     panic!("Operands must be two numbers.")
                 }
                 BinaryOperator::LessEqual => {
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     if let Some((left, right)) = pair_of_numbers(&left, &right) {
                         return Value::Bool(left <= right);
                     }
@@ -292,21 +292,21 @@ fn eval_expr(expr: Expression, state: &mut EnvStack) -> Value {
                     if truth_value(&left) {
                         return left;
                     }
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     right
                 }
                 BinaryOperator::And => {
                     if !truth_value(&left) {
                         return left;
                     }
-                    let right = eval_expr(*right, state);
+                    let right = eval_expr(right, state);
                     right
                 }
             }
         }
         Expression::MemberAssign { path, field, value } => {
             //TODO: replace with fully parsing the path
-            let v = eval_expr(*value, state);
+            let v = eval_expr(value, state);
             let full_path = field;
             state.assign(full_path, v.clone());
             v
