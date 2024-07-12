@@ -127,12 +127,12 @@ pub fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
                 let v = eval_expr(&definition.unwrap_or(Expression::Nil), state);
                 state.define(&name, v);
             }
-            Declaration::Statement(statement) => interpret_statement(*statement, state),
+            Declaration::Statement(statement) => interpret_statement(&statement, state),
         }
     }
 }
 
-fn interpret_statement(statement: Statement, state: &mut EnvStack) {
+fn interpret_statement(statement: &Statement, state: &mut EnvStack) {
     match statement {
         Statement::ExprStmt(expr) => {
             eval_expr(&expr, state);
@@ -143,16 +143,16 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
         }
         Statement::Block { body } => {
             state.push_env();
-            interpret(body, state);
+            interpret(body.clone(), state);
         }
         Statement::VarDecl(var_decl) => match var_decl {
             Declaration::VarDecl { name, definition } => {
-                let v = eval_expr(&definition.unwrap_or(Expression::Nil), state);
+                let v = eval_expr(definition.as_ref().unwrap_or(&Expression::Nil), state);
                 state.define(&name, v);
             }
             Declaration::ClassDecl { .. } => todo!(),
             Declaration::FunDecl(_) => todo!(),
-            Declaration::Statement(statement) => interpret_statement(*statement, state),
+            Declaration::Statement(statement) => interpret_statement(&statement, state),
         },
         Statement::IfStmt {
             condition,
@@ -161,15 +161,15 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
         } => {
             let cond = eval_expr(&condition, state);
             if truth_value(&cond) {
-                interpret_statement(*if_case, state);
-            } else if let Some(else_case) = *else_case {
+                interpret_statement(if_case, state);
+            } else if let Some(else_case) = else_case.as_ref() {
                 interpret_statement(else_case, state);
             }
         }
         Statement::WhileStmt { condition, body } => {
             //TODO: maybe eval_expr doesn't need to consume the expression?
             while (truth_value(&eval_expr(&condition, state))) {
-                interpret_statement(*body.clone(), state);
+                interpret_statement(body, state);
             }
         }
         Statement::ForStmt {
@@ -178,19 +178,22 @@ fn interpret_statement(statement: Statement, state: &mut EnvStack) {
             increment,
             body,
         } => {
-            interpret_statement(Statement::VarDecl(Declaration::Statement(stmt)), state);
-            let mut body_decls = vec![Declaration::Statement(body)];
-            if let Some(increment) = *increment {
+            interpret_statement(
+                &Statement::VarDecl(Declaration::Statement(stmt.clone())),
+                state,
+            );
+            let mut body_decls = vec![Declaration::Statement(body.clone())];
+            if let Some(increment) = increment.as_ref() {
                 body_decls.push(Declaration::Statement(Box::new(Statement::ExprStmt(
-                    increment,
+                    increment.clone(),
                 ))));
             }
-            let condition = condition.unwrap_or(Expression::Bool(true));
+            let condition = condition.clone().unwrap_or(Expression::Bool(true));
             let while_stmt = Statement::WhileStmt {
                 condition: Box::new(condition),
                 body: Box::new(Statement::Block { body: body_decls }),
             };
-            interpret_statement(while_stmt, state);
+            interpret_statement(&while_stmt, state);
         }
         _ => todo!(),
     }
