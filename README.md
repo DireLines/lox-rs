@@ -42,6 +42,6 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
     - 2024-06-27 [video](https://www.youtube.com/watch?v=tjFfXSbDVSg&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=20)
     - 2024-07-11 [video](https://www.youtube.com/watch?v=r2ts49dZGZ4&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=21)
 10. [Functions](https://craftinginterpreters.com/functions.html)
-    - 2024-07-27
+    - 2024-07-25
     
 
