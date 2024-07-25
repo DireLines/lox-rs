@@ -33,6 +33,10 @@ impl EnvStack {
     fn push_env(&mut self) {
         self.0.push(HashMap::new())
     }
+    fn pop_env(&mut self) {
+        //TODO: handle pop error
+        self.0.pop();
+    }
     fn current(&self) -> &Environment {
         self.0.last().expect("we do not expect empty list of environments, there should always at least be global scope")
     }
@@ -144,6 +148,7 @@ fn interpret_statement(statement: &Statement, state: &mut EnvStack) {
         Statement::Block { body } => {
             state.push_env();
             interpret(body, state);
+            state.pop_env();
         }
         Statement::VarDecl(var_decl) => match var_decl {
             Declaration::VarDecl { name, definition } => {

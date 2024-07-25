@@ -65,6 +65,15 @@ fn test_interpret_statement_if() {
 }
 
 #[test]
+fn test_interpret_statement_scope_closure() {
+    let program = "var a = 1; { var a = 2; } ";
+    let ast = parse_str_with(program, Program::new);
+    let mut env = EnvStack::default();
+    let _ = interpret(&ast.body, &mut env);
+    assert_eq!(*env.get("a").unwrap(), Value::Number(1.0));
+}
+
+#[test]
 fn test_interpret_statement_while() {
     let program = "var a = 1; while (a < 6) { a = a + 1; }";
     let ast = parse_str_with(program, Program::new);
