@@ -46,4 +46,5 @@ fn run(source: &str) {
     let ast = parse_str_with(source, Program::new);
     let mut env = EnvStack::default();
     interpret(ast.body, &mut env);
+    println!("{:?}", env);
 }

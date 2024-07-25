@@ -23,10 +23,10 @@ impl Display for Value {
 
 type Environment = HashMap<String, Value>;
 #[derive(Debug)]
-pub struct EnvStack(Vec<Environment>);
+pub struct EnvStack(Vec<Environment>, u64, u64);
 impl Default for EnvStack {
     fn default() -> Self {
-        Self(vec![Default::default()])
+        Self(vec![Default::default()], 0, 0)
     }
 }
 impl EnvStack {
@@ -133,6 +133,7 @@ pub fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
 }
 
 fn interpret_statement(statement: &Statement, state: &mut EnvStack) {
+    state.1 += 1;
     match statement {
         Statement::ExprStmt(expr) => {
             eval_expr(&expr, state);
@@ -199,6 +200,7 @@ fn interpret_statement(statement: &Statement, state: &mut EnvStack) {
     }
 }
 fn eval_expr(expr: &Expression, state: &mut EnvStack) -> Value {
+    state.2 += 1;
     match expr {
         Expression::Number(n) => Value::Number(*n),
         Expression::String(s) => Value::String(s.to_string()),
