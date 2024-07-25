@@ -36,7 +36,7 @@ fn test_eval_expr_declare() {
     let declare_ast = parse_str_with(declare, Declaration::new);
     let use_var_ast = parse_str_with(use_var, Expression::new);
     let mut env = EnvStack::default();
-    let _ = interpret(vec![declare_ast], &mut env);
+    let _ = interpret(&vec![declare_ast], &mut env);
     let result = eval_expr(&use_var_ast, &mut env);
     assert!(result == Value::Bool(true));
 }
@@ -50,7 +50,7 @@ fn test_eval_expr_declare_assign() {
     let assign_ast = parse_str_with(assign, Declaration::new);
     let use_var_ast = parse_str_with(use_var, Expression::new);
     let mut env = EnvStack::default();
-    let _ = interpret(vec![declare_ast, assign_ast], &mut env);
+    let _ = interpret(&vec![declare_ast, assign_ast], &mut env);
     let result = eval_expr(&use_var_ast, &mut env);
     assert!(result == Value::Bool(true));
 }
@@ -60,7 +60,7 @@ fn test_interpret_statement_if() {
     let program = "var a = 1; if (3 == 4) { a = 2; } else { a = 3; }";
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
-    let _ = interpret(ast.body, &mut env);
+    let _ = interpret(&ast.body, &mut env);
     assert_eq!(*env.get("a").unwrap(), Value::Number(3.0));
 }
 
@@ -69,7 +69,7 @@ fn test_interpret_statement_while() {
     let program = "var a = 1; while (a < 6) { a = a + 1; }";
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
-    let _ = interpret(ast.body, &mut env);
+    let _ = interpret(&ast.body, &mut env);
     assert_eq!(*env.get("a").unwrap(), Value::Number(6.0));
 }
 
@@ -78,7 +78,7 @@ fn test_interpret_statement_for() {
     let program = "var a = 0; for (var b = 0; b < 10; b = b + 1) { a = a + 1; }";
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
-    let _ = interpret(ast.body, &mut env);
+    let _ = interpret(&ast.body, &mut env);
     assert_eq!(*env.get("a").unwrap(), Value::Number(10.0));
 }
 
@@ -88,7 +88,7 @@ fn test_interpret_statement_for_external_var() {
         "var b = 0; var a = 0; var c = 0; for (b = 0; b < 10; b = b + 1) { a = a + 1; c = c + 1; }";
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
-    let _ = interpret(ast.body, &mut env);
+    let _ = interpret(&ast.body, &mut env);
     assert_eq!(*env.get("a").unwrap(), Value::Number(10.0));
     assert_eq!(*env.get("c").unwrap(), Value::Number(10.0));
 }
@@ -99,7 +99,7 @@ fn test_eval_expr_short_circuit_or() {
     let program = "var a = 1; var b = a or c;";
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
-    let _ = interpret(ast.body, &mut env);
+    let _ = interpret(&ast.body, &mut env);
     assert_eq!(*env.get("b").unwrap(), Value::Number(1.0));
 }
 
@@ -109,6 +109,6 @@ fn test_eval_expr_short_circuit_and() {
     let program = "var a = false; var b = a and c;";
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
-    let _ = interpret(ast.body, &mut env);
+    let _ = interpret(&ast.body, &mut env);
     assert_eq!(*env.get("b").unwrap(), Value::Bool(false));
 }

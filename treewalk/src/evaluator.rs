@@ -114,7 +114,7 @@ fn evaluate(program: Program) -> Result<()> {
     Ok(())
 }
 
-pub fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
+pub fn interpret(declarations: &[Declaration], state: &mut EnvStack) {
     for declaration in declarations {
         match declaration {
             Declaration::ClassDecl {
@@ -124,7 +124,7 @@ pub fn interpret(declarations: Vec<Declaration>, state: &mut EnvStack) {
             } => todo!(),
             Declaration::FunDecl(_) => todo!(),
             Declaration::VarDecl { name, definition } => {
-                let v = eval_expr(&definition.unwrap_or(Expression::Nil), state);
+                let v = eval_expr(definition.as_ref().unwrap_or(&Expression::Nil), state);
                 state.define(&name, v);
             }
             Declaration::Statement(statement) => interpret_statement(&statement, state),
@@ -143,7 +143,7 @@ fn interpret_statement(statement: &Statement, state: &mut EnvStack) {
         }
         Statement::Block { body } => {
             state.push_env();
-            interpret(body.clone(), state);
+            interpret(body, state);
         }
         Statement::VarDecl(var_decl) => match var_decl {
             Declaration::VarDecl { name, definition } => {
