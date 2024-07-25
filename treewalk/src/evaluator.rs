@@ -111,7 +111,7 @@ fn pair_of_strings(a: &Value, b: &Value) -> Option<(String, String)> {
     }
 }
 
-fn evaluate(program: Program) -> Result<()> {
+fn evaluate(program: &Program) -> Result<()> {
     //make the environment
     //parse the program
     //interpret each thing in the program
