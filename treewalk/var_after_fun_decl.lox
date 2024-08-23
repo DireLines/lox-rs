@@ -1,0 +1,4 @@
+fun returnSum(a, b) {
+  return a + b;
+}
+var a = returnSum(5,6);

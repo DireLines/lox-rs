@@ -1,9 +1,12 @@
-use crate::parser::{BinaryOperator, Declaration, Expression, Program, Statement, UnaryOperator};
+use crate::parser::{
+    BinaryOperator, Declaration, Expression, Function, Program, Statement, UnaryOperator,
+};
 use std::{collections::HashMap, error::Error, fmt::Display};
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 //lox runtime value
 #[derive(Debug, PartialEq, Clone)]
 enum Value {
+    Function(Function),
     Number(f64),
     String(String),
     Bool(bool),
@@ -13,6 +16,7 @@ enum Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Value::Function(fun) => write!(f, "<fun {}>", fun.name),
             Value::Number(n) => write!(f, "{n}"),
             Value::String(s) => write!(f, "{s}"),
             Value::Bool(b) => write!(f, "{b}"),
@@ -126,7 +130,7 @@ pub fn interpret(declarations: &[Declaration], state: &mut EnvStack) {
                 parent_name,
                 body,
             } => todo!(),
-            Declaration::FunDecl(_) => todo!(),
+            Declaration::FunDecl(fun) => state.define(&fun.name, Value::Function(fun.clone())),
             Declaration::VarDecl { name, definition } => {
                 let v = eval_expr(definition.as_ref().unwrap_or(&Expression::Nil), state);
                 state.define(&name, v);
@@ -199,6 +203,9 @@ fn interpret_statement(statement: &Statement, state: &mut EnvStack) {
                 body: Box::new(Statement::Block { body: body_decls }),
             };
             interpret_statement(&while_stmt, state);
+        }
+        Statement::ReturnStmt(value) => {
+            todo!()
         }
         _ => todo!(),
     }
@@ -319,7 +326,12 @@ fn eval_expr(expr: &Expression, state: &mut EnvStack) -> Value {
             state.assign(full_path, v.clone());
             v
         }
-        Expression::Call { base, path } => todo!(),
+        Expression::Call { base, path } => match base {
+            // Expression::Identifier(fun_name) => {
+            //     todo!();
+            // }
+            _ => todo!(),
+        },
         Expression::SuperFieldAccess { field } => todo!(),
         _ => Value::Nil,
     }

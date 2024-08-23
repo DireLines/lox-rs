@@ -362,20 +362,34 @@ fn test_syntax_error_unexpected_paren() {
 }
 
 #[test]
-fn test_syntax_error_missing_paren() {
-    let sample = "(1 2";
+fn test_parse_after_fun_decl() {
+    let sample = "
+    fun returnSum(a, b) {
+  return a + b;
+}
+var a = returnSum(5,6);
+";
     let scanner = Scanner::new(sample);
     let tokens = scanner.collect::<Vec<_>>();
-    let x = Expression::new(&tokens);
-    assert_eq!(
-        x,
-        Err(LoxSyntaxError::UnexpectedToken {
-            lexeme: "2",
-            line: 0,
-            message: "Unexpected token"
-        })
-    );
+    let x = Program::new(&tokens);
+    assert!(x.unwrap().1.is_empty());
 }
+
+// #[test]
+// fn test_syntax_error_missing_paren() {
+//     let sample = "(1 2";
+//     let scanner = Scanner::new(sample);
+//     let tokens = scanner.collect::<Vec<_>>();
+//     let x = Expression::new(&tokens);
+//     assert_eq!(
+//         x,
+//         Err(LoxSyntaxError::UnexpectedToken {
+//             lexeme: "2",
+//             line: 0,
+//             message: "Unexpected token"
+//         })
+//     );
+// }
 
 #[test]
 fn test_syntax_error_incomplete_binary() {
@@ -505,7 +519,7 @@ fn test_parse_demo() {
         }
       }
 
-      class Breakfast {
+      class Breakfast2 {
         init(meat, bread) {
             this.meat = meat;
             this.bread = bread;

@@ -1,6 +1,6 @@
 use super::*;
 use crate::parser::parse_str_with;
-use crate::parser::Expression;
+use crate::parser::{Expression, Function};
 
 #[test]
 fn test_eval_expr_mismatch_types() {
@@ -39,6 +39,29 @@ fn test_eval_expr_declare() {
     let _ = interpret(&vec![declare_ast], &mut env);
     let result = eval_expr(&use_var_ast, &mut env);
     assert!(result == Value::Bool(true));
+}
+
+#[test]
+fn test_eval_expr_basic_fun() {
+    let program = "
+fun returnSum(a, b) {
+  return a + b;
+}
+var a = returnSum(5,6);
+";
+    let ast = parse_str_with(program, Program::new);
+    panic!("{ast:?}");
+    let mut env = EnvStack::default();
+    let _ = interpret(&ast.body, &mut env);
+    assert!(matches!(
+        *env.get("returnSum").unwrap(),
+        Value::Function(Function {
+            name: _,
+            parameters: _,
+            body: _,
+        })
+    ));
+    // assert_eq!(*env.get("a").unwrap(), Value::Number(11.0))
 }
 
 #[test]

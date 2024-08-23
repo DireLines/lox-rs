@@ -565,9 +565,9 @@ impl Statement {
 }
 #[derive(Debug, PartialEq, Clone)]
 pub struct Function {
-    name: String,
-    parameters: Vec<String>,
-    body: Box<Option<Statement>>,
+    pub name: String,
+    pub parameters: Vec<String>,
+    pub body: Box<Option<Statement>>,
 }
 impl Function {
     grammar_rule!(Self::build_function : new -> IDENTIFIER LEFT_PAREN (IDENTIFIER (COMMA IDENTIFIER)* )? RIGHT_PAREN ([Statement::block])?);
