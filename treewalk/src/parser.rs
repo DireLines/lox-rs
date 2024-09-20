@@ -618,6 +618,7 @@ impl Declaration {
         Self::Statement(Box::new(data))
     }
 }
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum MemberAccess {
     Field(String),

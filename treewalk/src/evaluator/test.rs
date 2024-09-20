@@ -8,7 +8,7 @@ fn test_eval_expr_mismatch_types() {
     let x = parse_str_with(sample, Expression::new);
     let mut env = EnvStack::default();
     let result = eval_expr(&x, &mut env);
-    assert!(result == Value::Bool(false));
+    assert!(result.is_ok() && result.unwrap() == Value::Bool(false));
 }
 
 #[test]
@@ -17,7 +17,7 @@ fn test_eval_expr_trivial() {
     let x = parse_str_with(sample, Expression::new);
     let mut env = EnvStack::default();
     let result = eval_expr(&x, &mut env);
-    assert!(result == Value::Bool(true));
+    assert!(result.is_ok() && result.unwrap() == Value::Bool(true));
 }
 
 #[test]
@@ -26,7 +26,7 @@ fn test_eval_expr_nums() {
     let x = parse_str_with(sample, Expression::new);
     let mut env = EnvStack::default();
     let result = eval_expr(&x, &mut env);
-    assert!(result == Value::Bool(false));
+    assert!(result.is_ok() && result.unwrap() == Value::Bool(false));
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn test_eval_expr_declare() {
     let mut env = EnvStack::default();
     let _ = interpret(&vec![declare_ast], &mut env);
     let result = eval_expr(&use_var_ast, &mut env);
-    assert!(result == Value::Bool(true));
+    assert!(result.is_ok() && result.unwrap() == Value::Bool(true));
 }
 
 #[test]
@@ -50,7 +50,7 @@ fun returnSum(a, b) {
 var a = returnSum(5,6);
 ";
     let ast = parse_str_with(program, Program::new);
-    panic!("{ast:?}");
+    // panic!("{ast:?}");
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
     assert!(matches!(
@@ -61,7 +61,34 @@ var a = returnSum(5,6);
             body: _,
         })
     ));
-    // assert_eq!(*env.get("a").unwrap(), Value::Number(11.0))
+    assert_eq!(*env.get("a").unwrap(), Value::Number(11.0))
+}
+
+#[test]
+fn test_eval_expr_fun_early_exit() {
+    let program = "
+fun returnSum(a, b) {
+  if (true){
+    return a + b;
+  }
+  print a; //should not happen
+  return a * b;
+}
+var a = returnSum(5,6);
+";
+    let ast = parse_str_with(program, Program::new);
+    // panic!("{ast:?}");
+    let mut env = EnvStack::default();
+    let _ = interpret(&ast.body, &mut env);
+    assert!(matches!(
+        *env.get("returnSum").unwrap(),
+        Value::Function(Function {
+            name: _,
+            parameters: _,
+            body: _,
+        })
+    ));
+    assert_eq!(*env.get("a").unwrap(), Value::Number(11.0))
 }
 
 #[test]
@@ -75,7 +102,7 @@ fn test_eval_expr_declare_assign() {
     let mut env = EnvStack::default();
     let _ = interpret(&vec![declare_ast, assign_ast], &mut env);
     let result = eval_expr(&use_var_ast, &mut env);
-    assert!(result == Value::Bool(true));
+    assert!(result.is_ok() && result.unwrap() == Value::Bool(true));
 }
 
 #[test]
