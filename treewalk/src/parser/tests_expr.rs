@@ -30,7 +30,10 @@ mod assignment {
             Expression::MemberAssign {
                 path: vec![],
                 field: "time".to_string(),
-                value: Box::new(Expression::Identifier("money".into()))
+                value: Box::new(Expression::Identifier {
+                    name: "money".into(),
+                    resolution_depth: None
+                })
             },
             parse_str_with("time = money", Expression::new)
         );
@@ -51,12 +54,21 @@ mod logic_or {
         assert_eq!(
             Expression::Binary {
                 left: Box::new(Expression::Binary {
-                    left: Box::new(Expression::Identifier("coffee".into())),
+                    left: Box::new(Expression::Identifier {
+                        name: "coffee".into(),
+                        resolution_depth: None
+                    }),
                     operator: BinaryOperator::Or,
-                    right: Box::new(Expression::Identifier("tea".into())),
+                    right: Box::new(Expression::Identifier {
+                        name: "tea".into(),
+                        resolution_depth: None
+                    }),
                 }),
                 operator: BinaryOperator::Or,
-                right: Box::new(Expression::Identifier("me".into())),
+                right: Box::new(Expression::Identifier {
+                    name: "me".into(),
+                    resolution_depth: None
+                }),
             },
             parse_str_with("coffee or tea or me", Expression::new)
         )
@@ -70,9 +82,15 @@ mod logic_and {
     fn simple_logic() {
         assert_eq!(
             Expression::Binary {
-                left: Box::new(Expression::Identifier("Egg".into())),
+                left: Box::new(Expression::Identifier {
+                    name: "Egg".into(),
+                    resolution_depth: None
+                }),
                 operator: BinaryOperator::And,
-                right: Box::new(Expression::Identifier("spam".into())),
+                right: Box::new(Expression::Identifier {
+                    name: "spam".into(),
+                    resolution_depth: None
+                }),
             },
             parse_str_with("Egg and spam", Expression::new)
         )
@@ -196,7 +214,10 @@ mod call {
     fn member_access() {
         assert_eq!(
             Expression::Call {
-                base: Box::new(Expression::Identifier("alpha".into())),
+                base: Box::new(Expression::Identifier {
+                    name: "alpha".into(),
+                    resolution_depth: None
+                }),
                 path: vec![MemberAccess::Field("alice".into())]
             },
             parse_str_with("alpha.alice", Expression::call)
@@ -207,7 +228,10 @@ mod call {
     fn mix() {
         assert_eq!(
             Expression::Call {
-                base: Box::new(Expression::Identifier("alpha".into())),
+                base: Box::new(Expression::Identifier {
+                    name: "alpha".into(),
+                    resolution_depth: None
+                }),
                 path: vec![
                     MemberAccess::Args { args: vec![] },
                     MemberAccess::Args {
@@ -252,7 +276,10 @@ mod primary {
     #[test]
     fn identifier() {
         assert_eq!(
-            Expression::Identifier("atticus".into()),
+            Expression::Identifier {
+                name: "atticus".into(),
+                resolution_depth: None
+            },
             parse_str_with("atticus", Expression::new)
         );
     }

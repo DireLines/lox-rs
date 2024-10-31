@@ -44,6 +44,8 @@ fn run_prompt() -> Result<()> {
 
 fn run(source: &str) {
     let ast = parse_str_with(source, Program::new);
+    //TODO: variable resolution pass
+    //which modifies the AST to include resolution distances
     let mut env = EnvStack::default();
     interpret(&ast.body, &mut env);
 }

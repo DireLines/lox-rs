@@ -53,15 +53,7 @@ var a = returnSum(5,6);
     // panic!("{ast:?}");
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert!(matches!(
-        *env.get("returnSum").unwrap(),
-        Value::Function(Function {
-            name: _,
-            parameters: _,
-            body: _,
-        })
-    ));
-    assert_eq!(*env.get("a").unwrap(), Value::Number(11.0))
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -80,15 +72,7 @@ var a = returnSum(5,6);
     // panic!("{ast:?}");
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert!(matches!(
-        *env.get("returnSum").unwrap(),
-        Value::Function(Function {
-            name: _,
-            parameters: _,
-            body: _,
-        })
-    ));
-    assert_eq!(*env.get("a").unwrap(), Value::Number(11.0))
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -111,7 +95,7 @@ fn test_interpret_statement_if() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert_eq!(*env.get("a").unwrap(), Value::Number(3.0));
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -120,7 +104,7 @@ fn test_interpret_statement_scope_closure() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert_eq!(*env.get("a").unwrap(), Value::Number(1.0));
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -129,7 +113,7 @@ fn test_interpret_statement_while() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert_eq!(*env.get("a").unwrap(), Value::Number(6.0));
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -138,7 +122,7 @@ fn test_interpret_statement_for() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert_eq!(*env.get("a").unwrap(), Value::Number(10.0));
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -148,8 +132,7 @@ fn test_interpret_statement_for_external_var() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert_eq!(*env.get("a").unwrap(), Value::Number(10.0));
-    assert_eq!(*env.get("c").unwrap(), Value::Number(10.0));
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -159,7 +142,7 @@ fn test_eval_expr_short_circuit_or() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert_eq!(*env.get("b").unwrap(), Value::Number(1.0));
+    insta::assert_debug_snapshot!(env);
 }
 
 #[test]
@@ -169,5 +152,5 @@ fn test_eval_expr_short_circuit_and() {
     let ast = parse_str_with(program, Program::new);
     let mut env = EnvStack::default();
     let _ = interpret(&ast.body, &mut env);
-    assert_eq!(*env.get("b").unwrap(), Value::Bool(false));
+    insta::assert_debug_snapshot!(env);
 }

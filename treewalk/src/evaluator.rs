@@ -82,11 +82,10 @@ impl EnvStack {
     fn remove(&mut self, name: &str) -> Option<Value> {
         self.0.first_mut()?.remove(name)
     }
-    fn get(&self, name: &str) -> Option<&Value> {
-        for env in self.0.iter().rev() {
-            if let Some(v) = env.get(name) {
-                return Some(v);
-            }
+    fn get(&self, name: &str, resolution_depth: usize) -> Option<&Value> {
+        let env = self.0.get(resolution_depth).expect("there were not enough environments in the stack, even after semantic analysis to determine resolution distance");
+        if let Some(v) = env.get(name) {
+            return Some(v);
         }
         panic!("bad get");
         // throw new RuntimeError(name,
@@ -238,7 +237,17 @@ fn eval_expr(expr: &Expression, state: &mut EnvStack) -> Result<Value> {
     match expr {
         Expression::Number(n) => Ok(Value::Number(*n)),
         Expression::String(s) => Ok(Value::String(s.to_string())),
-        Expression::Identifier(name) => Ok(state.get(name).expect("variable not defined").clone()),
+        Expression::Identifier {
+            name,
+            resolution_depth,
+        } => Ok(state
+            .get(
+                name,
+                resolution_depth
+                    .expect("this happens after semantic pass to populate resolution distance"),
+            )
+            .expect("variable not defined")
+            .clone()),
         Expression::Bool(b) => Ok(Value::Bool(*b)),
         Expression::Nil => Ok(Value::Nil),
         Expression::This => panic!("need to know how classes work"),
@@ -351,8 +360,15 @@ fn eval_expr(expr: &Expression, state: &mut EnvStack) -> Result<Value> {
             Ok(v)
         }
         Expression::Call { base, path } => match base.as_ref() {
-            Expression::Identifier(fun_name) => {
-                let fun = state.get(&fun_name);
+            Expression::Identifier {
+                name: fun_name,
+                resolution_depth,
+            } => {
+                let fun = state.get(
+                    &fun_name,
+                    resolution_depth
+                        .expect("this happens after semantic pass to populate resolution distance"),
+                );
                 let member_access = &path[0];
                 match member_access {
                     crate::parser::MemberAccess::Field(_) => todo!(),

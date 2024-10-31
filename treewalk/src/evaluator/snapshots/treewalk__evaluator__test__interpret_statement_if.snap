@@ -1,0 +1,14 @@
+---
+source: src/evaluator/test.rs
+expression: env
+snapshot_kind: text
+---
+EnvStack(
+    [
+        {
+            "a": Number(
+                3.0,
+            ),
+        },
+    ],
+)

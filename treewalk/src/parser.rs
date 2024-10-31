@@ -426,7 +426,10 @@ pub enum LoxSyntaxError<'a> {
 pub enum Expression {
     Number(f64),
     String(String),
-    Identifier(String),
+    Identifier {
+        name: String,
+        resolution_depth: Option<usize>,
+    },
     Bool(bool),
     Nil,
     This,
@@ -861,7 +864,10 @@ impl Expression {
         }
     }
     fn build_ident(data: &str) -> Self {
-        Self::Identifier(data.to_string())
+        Self::Identifier {
+            name: data.to_string(),
+            resolution_depth: None,
+        }
     }
     fn build_super_field_access(ident: &str) -> Self {
         Self::SuperFieldAccess {
