@@ -49,6 +49,7 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
     - 2024-09-19 [video](https://www.youtube.com/watch?v=r4KlR0UOBY4&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=25)
 11. [Resolving and Binding](https://craftinginterpreters.com/resolving-and-binding.html)
     - 2024-10-03 [video](https://www.youtube.com/watch?v=kmD-WsOuIqQ&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=26)
-    - 2024-10-17
-    - 2024-10-31
+    - 2024-10-17 (not recorded)
+    - 2024-10-31 [video](https://www.youtube.com/watch?v=losuVdTeuxY&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=27)
+    - 2024-11-14
     
