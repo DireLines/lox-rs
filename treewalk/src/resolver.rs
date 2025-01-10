@@ -4,8 +4,6 @@ use crate::parser::{
 use std::{collections::HashMap, error::Error};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-//we need to store Function references so that when we resolve a function call,
-//we can look into the environment to find the function by name
 type Environment = HashMap<String, bool>;
 #[derive(Debug)]
 pub struct EnvStack(Vec<Environment>);
@@ -60,13 +58,12 @@ fn resolve_variables(program: &mut Program) {
     resolve_decls(&mut program.body, &mut env);
 }
 
-fn resolve_decls(declarations: &mut [Declaration], state: &mut EnvStack) -> Result<()> {
+fn resolve_decls(declarations: &mut [Declaration], state: &mut EnvStack) {
     for declaration in declarations {
         resolve_decl(declaration, state);
     }
-    Ok(())
 }
-fn resolve_decl(declaration: &mut Declaration, state: &mut EnvStack) -> Result<()> {
+fn resolve_decl(declaration: &mut Declaration, state: &mut EnvStack) {
     match declaration {
         Declaration::ClassDecl {
             name,
@@ -95,24 +92,23 @@ fn resolve_decl(declaration: &mut Declaration, state: &mut EnvStack) -> Result<(
             resolve_statement(statement.as_mut(), state);
         }
     }
-    Ok(())
 }
 
 fn resolve_statement(statement: &mut Statement, state: &mut EnvStack) -> Result<()> {
     match statement {
         Statement::ExprStmt(expr) => {
-            resolve_expr(expr, state)?;
+            resolve_expr(expr, state);
         }
         Statement::PrintStmt(expr) => {
-            resolve_expr(expr, state)?;
+            resolve_expr(expr, state);
         }
         Statement::Block { body } => {
             state.push_env();
-            resolve_decls(body, state)?;
+            resolve_decls(body, state);
             state.pop_env();
         }
         Statement::VarDecl(var_decl) => {
-            resolve_decl(var_decl, state)?;
+            resolve_decl(var_decl, state);
         }
         Statement::IfStmt {
             condition,
@@ -131,7 +127,7 @@ fn resolve_statement(statement: &mut Statement, state: &mut EnvStack) -> Result<
         }
         Statement::ReturnStmt(value) => {
             if let Some(value) = value {
-                resolve_expr(value, state)?;
+                resolve_expr(value, state);
             }
         }
         _ => todo!(),
@@ -139,7 +135,7 @@ fn resolve_statement(statement: &mut Statement, state: &mut EnvStack) -> Result<
     Ok(())
 }
 
-fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) -> Result<()> {
+fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) {
     match expr {
         Expression::Identifier {
             name,
@@ -152,7 +148,6 @@ fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) -> Result<()> {
                     *resolution_depth = Some(state.0.len() - i);
                 }
             }
-            Ok(())
         }
         Expression::Grouping { expression } => resolve_expr(expression, state),
         Expression::Unary { operator, right } => resolve_expr(right, state),
@@ -163,7 +158,6 @@ fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) -> Result<()> {
         } => {
             resolve_expr(left, state);
             resolve_expr(right, state);
-            Ok(())
         }
         Expression::MemberAssign {
             path,
@@ -172,7 +166,7 @@ fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) -> Result<()> {
             resolution_depth,
         } => {
             //TODO: replace with fully parsing the path
-            let v = resolve_expr(value, state)?;
+            let v = resolve_expr(value, state);
             let full_path = field;
             for (i, scope) in state.0.iter().rev().enumerate() {
                 if scope.contains_key(full_path) {
@@ -180,7 +174,6 @@ fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) -> Result<()> {
                 }
             }
             state.assign(full_path, true);
-            Ok(v)
         }
         Expression::Call { base, path } => {
             resolve_expr(base, state);
@@ -193,11 +186,7 @@ fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) -> Result<()> {
                     match member_access {
                         crate::parser::MemberAccess::Field(_) => todo!(),
                         crate::parser::MemberAccess::Args { args } => {
-                            args
-                            .iter_mut()
-                            .map(|arg| resolve_expr(arg, state).expect("we don't think you can hit a return statement, which is the only reason you can get an err, when evaluating args"))
-                            .collect::<Vec<_>>();
-                            Ok(())
+                            args.iter_mut().for_each(|arg| resolve_expr(arg, state))
                         }
                     }
                 }
@@ -205,6 +194,6 @@ fn resolve_expr(expr: &mut Expression, state: &mut EnvStack) -> Result<()> {
             }
         }
         Expression::SuperFieldAccess { field } => todo!(),
-        _ => Ok(()),
+        _ => {}
     }
 }
