@@ -449,6 +449,7 @@ pub enum Expression {
         path: Vec<MemberAccess>,
         field: String,
         value: Box<Expression>,
+        resolution_depth: Option<usize>,
     },
     Call {
         base: Box<Expression>,
@@ -477,12 +478,6 @@ pub enum Declaration {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     ExprStmt(Expression),
-    ForStmt {
-        stmt: Box<Statement>,
-        condition: Box<Option<Expression>>,
-        increment: Box<Option<Expression>>,
-        body: Box<Statement>,
-    },
     IfStmt {
         condition: Box<Expression>,
         if_case: Box<Statement>,
@@ -504,7 +499,7 @@ pub enum Statement {
 impl Statement {
     grammar_rule!(new -> ([Statement::expr_stmt] | [Statement::for_stmt] | [Statement::if_stmt] | [Statement::print_stmt] | [Statement::return_stmt] | [Statement::while_stmt] | [Statement::block]) );
     grammar_rule!(Self::build_expr_stmt : expr_stmt -> [Expression::new] SEMICOLON );
-    grammar_rule!(Self::build_for_stmt : for_stmt -> FOR LEFT_PAREN
+    grammar_rule!(Self::desugar_for_stmt_to_while : for_stmt -> FOR LEFT_PAREN
         ( [Statement::var_decl] | [Statement::expr_stmt] | [Statement::empty_stmt] )
         ( [Expression::new] )? SEMICOLON
         ( [Expression::new] )? RIGHT_PAREN [Statement::new] );
@@ -526,7 +521,7 @@ impl Statement {
         Self::VarDecl(decl)
     }
 
-    fn build_for_stmt(
+    fn desugar_for_stmt_to_while(
         (stmt, condition, increment, body): (
             Statement,
             Option<Expression>,
@@ -534,11 +529,21 @@ impl Statement {
             Statement,
         ),
     ) -> Self {
-        Self::ForStmt {
-            stmt: Box::new(stmt),
-            condition: Box::new(condition),
-            increment: Box::new(increment),
-            body: Box::new(body),
+        let mut body_decls = vec![Declaration::Statement(Box::new(body))];
+        if let Some(increment) = increment.as_ref() {
+            body_decls.push(Declaration::Statement(Box::new(Statement::ExprStmt(
+                increment.clone(),
+            ))));
+        }
+        let condition = condition.clone().unwrap_or(Expression::Bool(true));
+        Statement::Block {
+            body: vec![
+                Declaration::Statement(Box::new(stmt)),
+                Declaration::Statement(Box::new(Statement::WhileStmt {
+                    condition: Box::new(condition),
+                    body: Box::new(Statement::Block { body: body_decls }),
+                })),
+            ],
         }
     }
     fn build_if_stmt(
@@ -796,6 +801,7 @@ impl Expression {
             path,
             field: ident.to_string(),
             value: Box::new(value),
+            resolution_depth: None,
         }
     }
     fn build_term((first, rest): (Expression, Vec<(TokenType, Expression)>)) -> Self {

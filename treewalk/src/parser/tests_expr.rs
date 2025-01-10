@@ -33,7 +33,8 @@ mod assignment {
                 value: Box::new(Expression::Identifier {
                     name: "money".into(),
                     resolution_depth: None
-                })
+                }),
+                resolution_depth: None
             },
             parse_str_with("time = money", Expression::new)
         );
@@ -573,7 +574,8 @@ fn test_parse_member_assign() {
         Expression::MemberAssign {
             path: vec![MemberAccess::Field("x".to_owned())],
             field: "y".to_owned(),
-            value: Box::new(Expression::Number(5.0))
+            value: Box::new(Expression::Number(5.0)),
+            resolution_depth: None
         },
     );
 }

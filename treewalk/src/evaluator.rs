@@ -200,29 +200,6 @@ fn interpret_statement(statement: &Statement, state: &mut EnvStack) -> Result<()
                 interpret_statement(body, state)?;
             }
         }
-        Statement::ForStmt {
-            stmt,
-            condition,
-            increment,
-            body,
-        } => {
-            interpret_statement(
-                &Statement::VarDecl(Declaration::Statement(stmt.clone())),
-                state,
-            )?;
-            let mut body_decls = vec![Declaration::Statement(body.clone())];
-            if let Some(increment) = increment.as_ref() {
-                body_decls.push(Declaration::Statement(Box::new(Statement::ExprStmt(
-                    increment.clone(),
-                ))));
-            }
-            let condition = condition.clone().unwrap_or(Expression::Bool(true));
-            let while_stmt = Statement::WhileStmt {
-                condition: Box::new(condition),
-                body: Box::new(Statement::Block { body: body_decls }),
-            };
-            interpret_statement(&while_stmt, state)?;
-        }
         Statement::ReturnStmt(value) => {
             if let Some(value) = value {
                 let return_value = eval_expr(value, state)?;
@@ -242,11 +219,7 @@ fn eval_expr(expr: &Expression, state: &mut EnvStack) -> Result<Value> {
             name,
             resolution_depth,
         } => Ok(state
-            .get(
-                name,
-                resolution_depth
-                    .expect("this happens after semantic pass to populate resolution distance"),
-            )
+            .get(name, resolution_depth.expect("variable not defined"))
             .expect("variable not defined")
             .clone()),
         Expression::Bool(b) => Ok(Value::Bool(*b)),
@@ -353,7 +326,12 @@ fn eval_expr(expr: &Expression, state: &mut EnvStack) -> Result<Value> {
                 }
             }
         }
-        Expression::MemberAssign { path, field, value } => {
+        Expression::MemberAssign {
+            path,
+            field,
+            value,
+            resolution_depth,
+        } => {
             //TODO: replace with fully parsing the path
             let v = eval_expr(value, state)?;
             let full_path = field;
