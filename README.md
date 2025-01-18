@@ -52,4 +52,7 @@ Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
     - 2024-10-17 (not recorded)
     - 2024-10-31 [video](https://www.youtube.com/watch?v=losuVdTeuxY&list=PLeYi2PClG0Iuq_hfaL66V9PfSfG5WicHQ&index=27)
     - 2024-11-14
+    - 2024-12-12
+    - 2025-01-09
+    
     
